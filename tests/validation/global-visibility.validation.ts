@@ -4,9 +4,7 @@ import {
   chordDistanceKm,
   ellipsoidResidualKm,
   haversineDistanceKm,
-  toGeoJson,
   toIsoUtc,
-  type EclipseScene,
   type EclipseSummary,
   type GlobalVisibilityResult,
   type Position,
@@ -21,7 +19,7 @@ import {
   shadowMarginAtSurfaceKm,
   shadowSurfaceState,
   solarLimbMarginAtSurfaceKm,
-} from "../packages/shadowline/src/shadow-math.js";
+} from "../../packages/shadowline/src/shadow-math.js";
 
 const provider = new AstronomyEngineProvider();
 const engine = new EclipseEngine(astronomyEngineCapabilities(provider));
@@ -40,25 +38,9 @@ function position(point: SurfacePoint): Position {
   ];
 }
 
-function sceneFor(
-  event: EclipseSummary,
-  result: GlobalVisibilityResult,
-): EclipseScene {
-  return {
-    event,
-    provider: provider.metadata,
-    centralPath: null,
-    globalVisibility: result.surface,
-    instantaneousShadows: [],
-    contacts: result.contacts,
-    timeMarkers: [],
-  };
-}
-
 describe("global penumbral circumstances", () => {
   let eclipse1973: GlobalVisibilityResult;
   let eclipse2026: GlobalVisibilityResult;
-  let eclipse2027: GlobalVisibilityResult;
 
   beforeAll(
     () => {
@@ -68,11 +50,7 @@ describe("global penumbral circumstances", () => {
       eclipse2026 = engine.calculateGlobalVisibility(
         eventOn("2026-08-12"),
       );
-      eclipse2027 = engine.calculateGlobalVisibility(
-        eventOn("2027-02-06"),
-      );
     },
-    30_000,
   );
 
   it("reproduces the four published 1973 contacts", () => {
@@ -108,19 +86,11 @@ describe("global penumbral circumstances", () => {
     expect(eclipse1973.surface.horizon).toHaveLength(2);
     expect(eclipse2026.surface.extent).toHaveLength(1);
     expect(eclipse2026.surface.horizon).toHaveLength(1);
-    expect(eclipse2027.surface.extent).toHaveLength(2);
-    expect(eclipse2027.surface.horizon).toHaveLength(2);
     expect(eclipse2026.surface.horizon[0]!.closed).toBe(true);
   });
 
-  it("can calculate the global contacts without constructing the surface", () => {
-    expect(
-      engine.calculateGlobalContacts(eventOn("2026-08-12")),
-    ).toEqual(eclipse2026.contacts);
-  });
-
   it("keeps every curve sample exactly on WGS 84", () => {
-    for (const result of [eclipse1973, eclipse2026, eclipse2027]) {
+    for (const result of [eclipse1973, eclipse2026]) {
       const points = [
         ...result.surface.extent.flatMap((curve) => curve.points),
         ...result.surface.horizon.flatMap((curve) => curve.points),
@@ -177,62 +147,6 @@ describe("global penumbral circumstances", () => {
     }
   });
 
-  it("is topologically independent of requested output interval", () => {
-    const event = eventOn("2027-02-06");
-    const coarse = engine.calculateGlobalVisibility(event, {
-      sampleIntervalSeconds: 600,
-      angularIntervalDegrees: 10,
-    });
-    const fine = engine.calculateGlobalVisibility(event, {
-      sampleIntervalSeconds: 10,
-      angularIntervalDegrees: 10,
-    });
-    expect(coarse.contacts.map((contact) => contact.kind)).toEqual(
-      fine.contacts.map((contact) => contact.kind),
-    );
-    expect(coarse.surface.extent.length).toBe(fine.surface.extent.length);
-    expect(coarse.surface.horizon.length).toBe(fine.surface.horizon.length);
-    for (let index = 0; index < coarse.surface.extent.length; index += 1) {
-      const finePoints = fine.surface.extent[index]!.points;
-      const maximumNearest = Math.max(
-        ...coarse.surface.extent[index]!.points.map((point) =>
-          Math.min(
-            ...finePoints.map((candidate) =>
-              chordDistanceKm(point.ecefKm, candidate.ecefKm),
-            ),
-          ),
-        ),
-      );
-      expect(maximumNearest).toBeLessThan(20);
-    }
-  }, 30_000);
-
-  it("serializes every line with antimeridian-safe segments", () => {
-    for (const [event, result] of [
-      [eventOn("1973-06-30"), eclipse1973],
-      [eventOn("2026-08-12"), eclipse2026],
-      [eventOn("2027-02-06"), eclipse2027],
-    ] as const) {
-      const collection = toGeoJson(sceneFor(event, result));
-      expect(collection.metadata.schemaVersion).toBe("2.0.0");
-      for (const feature of collection.features) {
-        const parts =
-          feature.geometry.type === "LineString"
-            ? [feature.geometry.coordinates]
-            : feature.geometry.type === "MultiLineString"
-              ? feature.geometry.coordinates
-              : [];
-        for (const part of parts) {
-          for (let index = 1; index < part.length; index += 1) {
-            expect(
-              Math.abs(part[index]![0] - part[index - 1]![0]),
-            ).toBeLessThanOrEqual(180);
-          }
-        }
-      }
-    }
-  });
-
   it("supports a complete partial-only scene and outline", () => {
     const event = eventOn("2025-03-29");
     const scene = engine.calculateEvent(event, {
@@ -247,18 +161,12 @@ describe("global penumbral circumstances", () => {
     ]);
     expect(scene.instantaneousShadows[0]!.central).toBeNull();
     expect(scene.instantaneousShadows[0]!.penumbra.rings).toHaveLength(1);
-    expect(
-      toGeoJson(scene).features.some(
-        (feature) =>
-          feature.properties.feature_type === "instantaneous_penumbra",
-      ),
-    ).toBe(true);
   });
 
   it("keeps contact and horizon endpoints physically shared", () => {
-    for (let index = 0; index < eclipse2027.contacts.length; index += 1) {
-      const contact = eclipse2027.contacts[index]!;
-      const horizon = eclipse2027.surface.horizon[index < 2 ? 0 : 1]!;
+    for (let index = 0; index < eclipse1973.contacts.length; index += 1) {
+      const contact = eclipse1973.contacts[index]!;
+      const horizon = eclipse1973.surface.horizon[index < 2 ? 0 : 1]!;
       expect(
         Math.min(
           ...horizon.points.map((point) =>

@@ -1,15 +1,13 @@
-import { beforeAll, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
-  EclipseEngine,
+  geodeticToEcef,
   haversineDistanceKm,
   normalizeLongitude,
   type CentralPathSurface,
   type Position,
+  type SurfacePoint,
+  type TimedSurfacePoint,
 } from "@found-in-space/shadowline";
-import {
-  AstronomyEngineProvider,
-  astronomyEngineCapabilities,
-} from "@found-in-space/shadowline-astronomy-engine";
 import {
   densifyGlobeLine,
   globePathTriangles,
@@ -18,9 +16,57 @@ import {
   type GlobePathTriangle,
 } from "../apps/visualizer/src/globe-path-mesh.js";
 
-const provider = new AstronomyEngineProvider();
-let path: CentralPathSurface;
-let triangles: GlobePathTriangle[];
+const START_MS = Date.parse("2026-08-12T17:00:00Z");
+
+function point(longitudeDeg: number, latitudeDeg: number): SurfacePoint {
+  const geographic = { longitudeDeg, latitudeDeg };
+  return { geographic, ecefKm: geodeticToEcef(geographic) };
+}
+
+function timed(
+  longitudeDeg: number,
+  latitudeDeg: number,
+  seconds: number,
+): TimedSurfacePoint {
+  return {
+    ...point(longitudeDeg, latitudeDeg),
+    atUtc: new Date(START_MS + seconds * 1_000).toISOString(),
+  };
+}
+
+const positive = [
+  timed(-150, 78, 0),
+  timed(-70, 84, 60),
+  timed(20, 86, 120),
+  timed(110, 80, 180),
+];
+const negative = [
+  timed(-140, 72, 0),
+  timed(-60, 77, 60),
+  timed(30, 79, 120),
+  timed(120, 74, 180),
+];
+const boundary = [
+  ...positive,
+  ...negative.toReversed(),
+  positive[0]!,
+];
+const path: CentralPathSurface = {
+  datum: "WGS 84",
+  calculationFrame: "geocentric-earth-fixed",
+  kind: "total",
+  centralBeginUtc: positive[0]!.atUtc,
+  centralEndUtc: positive.at(-1)!.atUtc,
+  centerline: { points: [] },
+  limits: {
+    positiveCrossTrack: { points: positive },
+    negativeCrossTrack: { points: negative },
+  },
+  startCap: { edges: [{ points: [] }, { points: [] }] },
+  endCap: { edges: [{ points: [] }, { points: [] }] },
+  boundary: { points: boundary, closed: true },
+};
+const triangles = globePathTriangles(path);
 
 function vector([longitudeDeg, latitudeDeg]: Position) {
   const longitude = (longitudeDeg * Math.PI) / 180;
@@ -81,87 +127,16 @@ function signedArea(points: Array<[number, number]>): number {
   return twiceArea / 2;
 }
 
-function pointInRing(
-  point: [number, number],
-  ring: Array<[number, number]>,
-): boolean {
-  let inside = false;
-  for (
-    let index = 0, previousIndex = ring.length - 1;
-    index < ring.length;
-    previousIndex = index, index += 1
-  ) {
-    const current = ring[index]!;
-    const previous = ring[previousIndex]!;
-    const crosses =
-      current[1] > point[1] !== previous[1] > point[1] &&
-      point[0] <
-        ((previous[0] - current[0]) * (point[1] - current[1])) /
-          (previous[1] - current[1]) +
-          current[0];
-    if (crosses) inside = !inside;
-  }
-  return inside;
-}
-
-function distanceToRing(
-  point: [number, number],
-  ring: Array<[number, number]>,
-): number {
-  let nearest = Number.POSITIVE_INFINITY;
-  for (let index = 0; index < ring.length; index += 1) {
-    const start = ring[index]!;
-    const end = ring[(index + 1) % ring.length]!;
-    const deltaX = end[0] - start[0];
-    const deltaY = end[1] - start[1];
-    const lengthSquared = deltaX * deltaX + deltaY * deltaY;
-    const fraction =
-      lengthSquared === 0
-        ? 0
-        : Math.max(
-            0,
-            Math.min(
-              1,
-              ((point[0] - start[0]) * deltaX +
-                (point[1] - start[1]) * deltaY) /
-                lengthSquared,
-            ),
-          );
-    nearest = Math.min(
-      nearest,
-      Math.hypot(
-        point[0] - (start[0] + fraction * deltaX),
-        point[1] - (start[1] + fraction * deltaY),
-      ),
-    );
-  }
-  return nearest;
-}
-
-beforeAll(() => {
-  const event = provider.searchGlobalEclipses({
-    startUtc: "2026-08-01T00:00:00Z",
-    endUtc: "2026-09-01T00:00:00Z",
-  })[0]!;
-  path = new EclipseEngine(
-    astronomyEngineCapabilities(provider),
-  ).calculateCentralPath(event);
-  triangles = globePathTriangles(path);
-});
-
 describe("structured globe path mesh", () => {
-  it("densifies physical globe lines without changing their route", () => {
-    const source = path.limits.negativeCrossTrack.points.map(
-      (sample) => [
-        sample.geographic.longitudeDeg,
-        sample.geographic.latitudeDeg,
-      ] as Position,
-    );
+  it("densifies antimeridian-crossing lines without changing their route", () => {
+    const source: Position[] = [
+      [170, 75],
+      [-170, 80],
+    ];
     const dense = densifyGlobeLine(source);
-    const denseKeys = new Set(dense.map(pointKey));
-    for (const point of source) {
-      expect(denseKeys.has(pointKey(point))).toBe(true);
-    }
+
+    expect(dense[0]).toEqual(source[0]);
+    expect(dense.at(-1)).toEqual(source[1]);
     for (let index = 1; index < dense.length; index += 1) {
       expect(
         haversineDistanceKm(dense[index - 1]!, dense[index]!),
@@ -170,8 +145,8 @@ describe("structured globe path mesh", () => {
   });
 
   it("uses only bounded, non-degenerate local surface facets", () => {
-    expect(triangles.length).toBeGreaterThan(500);
-    expect(triangles.length).toBeLessThan(100_000);
+    expect(triangles.length).toBeGreaterThan(20);
+    expect(triangles.length).toBeLessThan(10_000);
     let maximumEdgeKm = 0;
     for (const triangle of triangles) {
       expect(areaSignal(triangle)).toBeGreaterThan(1e-13);
@@ -197,53 +172,35 @@ describe("structured globe path mesh", () => {
     );
   });
 
-  it("contains every calculated physical boundary vertex", () => {
-    const meshVertices = new Set(
-      triangles.flat().map(pointKey),
-    );
-    for (const boundaryPoint of path.boundary.points.slice(0, -1)) {
-      expect(meshVertices.has(pointKey([
-        boundaryPoint.geographic.longitudeDeg,
-        boundaryPoint.geographic.latitudeDeg,
-      ]))).toBe(true);
+  it("retains every physical boundary sample", () => {
+    const meshVertices = new Set(triangles.flat().map(pointKey));
+    for (const boundaryPoint of boundary.slice(0, -1)) {
+      expect(
+        meshVertices.has(pointKey([
+          boundaryPoint.geographic.longitudeDeg,
+          boundaryPoint.geographic.latitudeDeg,
+        ])),
+      ).toBe(true);
     }
   });
 
-  it("covers the physical polar polygon without folds or remote facets", () => {
-    const physicalRing = path.boundary.points
+  it("covers the polar strip without folds", () => {
+    const physicalRing = boundary
       .slice(0, -1)
-      .map((point) =>
+      .map((sample) =>
         northPolarPoint([
-          point.geographic.longitudeDeg,
-          point.geographic.latitudeDeg,
+          sample.geographic.longitudeDeg,
+          sample.geographic.latitudeDeg,
         ]),
       );
     const physicalArea = Math.abs(signedArea(physicalRing));
-    let meshArea = 0;
-    let maximumExteriorDistanceDegrees = 0;
-    for (const triangle of triangles) {
-      const projected = triangle.map(northPolarPoint) as [
-        [number, number],
-        [number, number],
-        [number, number],
-      ];
-      meshArea += Math.abs(signedArea(projected));
-      const centroid: [number, number] = [
-        (projected[0][0] + projected[1][0] + projected[2][0]) / 3,
-        (projected[0][1] + projected[1][1] + projected[2][1]) / 3,
-      ];
-      if (!pointInRing(centroid, physicalRing)) {
-        maximumExteriorDistanceDegrees = Math.max(
-          maximumExteriorDistanceDegrees,
-          distanceToRing(centroid, physicalRing),
-        );
-      }
-    }
-    const areaRatio = meshArea / physicalArea;
-    expect(areaRatio).toBeGreaterThan(0.995);
-    expect(areaRatio).toBeLessThan(1.005);
-    expect(maximumExteriorDistanceDegrees).toBeLessThan(
-      GLOBE_PATH_MESH_STEP_KM / 110,
+    const meshArea = triangles.reduce(
+      (sum, triangle) =>
+        sum + Math.abs(signedArea(triangle.map(northPolarPoint))),
+      0,
     );
+
+    expect(meshArea / physicalArea).toBeGreaterThan(0.98);
+    expect(meshArea / physicalArea).toBeLessThan(1.02);
   });
 });

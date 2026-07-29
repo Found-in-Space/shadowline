@@ -61,10 +61,17 @@ development:
 npm install
 npm run dev          # Vite dev server → http://127.0.0.1:5173/
 npm run typecheck    # workspace and tool TypeScript contracts
-npm test             # unit and integration tests
+npm test             # fast sandbox-friendly regression tests
+npm run test:validation # slower scientific reference/path validation
 npm run build        # packages and production visualizer
 npm run test:browser # Playwright application scenarios
 ```
+
+The default Vitest suite resolves workspace packages directly to source and
+enforces a two-second ceiling per test and setup hook. Full eclipse-path,
+historical, and published-reference checks live in the separately invoked
+`test:validation` tier so they cannot make the sandbox-oriented unit command
+unreliable.
 
 Open `http://127.0.0.1:5173`. The application and eclipse calculations run
 locally. Standard OpenStreetMap raster tiles are requested over the network for

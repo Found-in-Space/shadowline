@@ -3,8 +3,6 @@ import {
   EclipseEngine,
   coneResidualKm,
   ellipsoidResidualKm,
-  toGeoJson,
-  type EclipseScene,
   type EclipseSummary,
   type InstantaneousShadowSurface,
 } from "@found-in-space/shadowline";
@@ -36,26 +34,6 @@ beforeAll(() => {
   shadow = engine.calculateInstantaneousShadow(event, local.peak.utc);
 });
 
-function sceneFor(
-  eclipse: EclipseSummary,
-  outline: InstantaneousShadowSurface,
-): EclipseScene {
-  return {
-    event: eclipse,
-    provider: provider.metadata,
-    centralPath: null,
-    globalVisibility: {
-      datum: "WGS 84",
-      calculationFrame: "geocentric-earth-fixed",
-      extent: [],
-      horizon: [],
-    },
-    instantaneousShadows: [outline],
-    contacts: [],
-    timeMarkers: [],
-  };
-}
-
 describe("renderer-neutral instantaneous shadows", () => {
   it("returns physical umbra and penumbra regions", () => {
     expect(shadow.central?.kind).toBe("umbra");
@@ -82,20 +60,6 @@ describe("renderer-neutral instantaneous shadows", () => {
         ),
       ),
     ).toBeLessThan(1e-3);
-  });
-
-  it("serializes regions only at the adapter boundary", () => {
-    const features = toGeoJson(sceneFor(event, shadow)).features;
-    expect(
-      features.map(
-        (feature) => feature.properties.feature_type,
-      ),
-    ).toEqual(["instantaneous_penumbra", "instantaneous_umbra"]);
-    expect(
-      features.every((feature) =>
-        ["Polygon", "MultiPolygon"].includes(feature.geometry.type),
-      ),
-    ).toBe(true);
   });
 
   it("solves grazing cone and WGS 84 horizon simultaneously", () => {

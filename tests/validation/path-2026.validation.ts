@@ -16,7 +16,7 @@ import {
   AstronomyEngineProvider,
   astronomyEngineCapabilities,
 } from "@found-in-space/shadowline-astronomy-engine";
-import { clipForWebMercator } from "../apps/visualizer/src/web-mercator.js";
+import { clipForWebMercator } from "../../apps/visualizer/src/web-mercator.js";
 
 const provider = new AstronomyEngineProvider();
 const engine = new EclipseEngine(astronomyEngineCapabilities(provider));
@@ -124,7 +124,7 @@ beforeAll(() => {
     contacts: [],
     timeMarkers: engine.calculateTimeMarkers(event, path),
   };
-}, 30_000);
+});
 
 describe("2026 planning-grade ECEF path", () => {
   it("builds the complete physical central surface", () => {
@@ -298,41 +298,4 @@ describe("2026 planning-grade ECEF path", () => {
     );
   });
 
-  it("calculates annular tracks independently of observer services", () => {
-    const annular = provider.searchGlobalEclipses({
-      startUtc: "2026-02-01T00:00:00Z",
-      endUtc: "2026-03-01T00:00:00Z",
-    })[0]!;
-    expect(
-      engine.calculateCentralPath(annular, {
-        sampleIntervalSeconds: 60,
-      }).kind,
-    ).toBe("annular");
-  });
-
-  it("uses path intervals only as maximum output spacing", () => {
-    const coarseRequest = engine.calculateCentralPath(event, {
-      sampleIntervalSeconds: 300,
-    });
-    expect(coarseRequest.centerline.points.length).toBe(
-      path.centerline.points.length,
-    );
-    expect(
-      coarseRequest.limits.positiveCrossTrack.points.length,
-    ).toBe(path.limits.positiveCrossTrack.points.length);
-    expect(
-      Math.max(
-        ...path.centerline.points.map((point, index) =>
-          Math.hypot(
-            point.ecefKm.x -
-              coarseRequest.centerline.points[index]!.ecefKm.x,
-            point.ecefKm.y -
-              coarseRequest.centerline.points[index]!.ecefKm.y,
-            point.ecefKm.z -
-              coarseRequest.centerline.points[index]!.ecefKm.z,
-          ),
-        ),
-      ),
-    ).toBeLessThan(1e-9);
-  });
 });

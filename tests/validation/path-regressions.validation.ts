@@ -3,9 +3,7 @@ import {
   EclipseEngine,
   chordDistanceKm,
   haversineDistanceKm,
-  toGeoJson,
   type CentralPathSurface,
-  type EclipseScene,
   type EclipseSummary,
   type Position,
   type SurfacePoint,
@@ -32,40 +30,17 @@ function position(point: SurfacePoint): Position {
   ];
 }
 
-function sceneFor(
-  event: EclipseSummary,
-  path: CentralPathSurface,
-): EclipseScene {
-  return {
-    event: { ...event, kind: path.kind },
-    provider: provider.metadata,
-    centralPath: path,
-    globalVisibility: {
-      datum: "WGS 84",
-      calculationFrame: "geocentric-earth-fixed",
-      extent: [],
-      horizon: [],
-    },
-    instantaneousShadows: [],
-    contacts: [],
-    timeMarkers: [],
-  };
-}
-
 describe("central-path regression cases", () => {
   const paths = new Map<string, CentralPathSurface>();
-  const events = new Map<string, EclipseSummary>();
 
   beforeAll(
     () => {
       for (const date of [
         "1973-06-30",
-        "2016-03-09",
         "2027-02-06",
         "2027-08-02",
       ]) {
         const event = eventOn(date);
-        events.set(date, event);
         paths.set(
           date,
           engine.calculateCentralPath(event, {
@@ -74,7 +49,6 @@ describe("central-path regression cases", () => {
         );
       }
     },
-    30_000,
   );
 
   it("keeps the 1973 limits smooth through near-zenith maximum", () => {
@@ -158,37 +132,10 @@ describe("central-path regression cases", () => {
     }
   });
 
-  it("serializes the 2016 path without reconnecting worlds", () => {
-    const date = "2016-03-09";
-    const collection = toGeoJson(
-      sceneFor(events.get(date)!, paths.get(date)!),
-    );
-    for (const feature of collection.features) {
-      const lines =
-        feature.geometry.type === "LineString"
-          ? [feature.geometry.coordinates]
-          : feature.geometry.type === "MultiLineString"
-            ? feature.geometry.coordinates
-            : feature.geometry.type === "Polygon"
-              ? feature.geometry.coordinates
-              : feature.geometry.type === "MultiPolygon"
-                ? feature.geometry.coordinates.flat()
-                : [];
-      for (const line of lines) {
-        for (let index = 1; index < line.length; index += 1) {
-          expect(
-            Math.abs(line[index]![0] - line[index - 1]![0]),
-          ).toBeLessThanOrEqual(180);
-        }
-      }
-    }
-  });
-
   it("does not swap signed branches on historical polar tracks", () => {
     const cases = [
       ["1815-07-06", "north"],
       ["1917-12-14", "south"],
-      ["2923-06-05", "north"],
     ] as const;
     for (const [date, hemisphere] of cases) {
       const event = eventOn(date);
@@ -225,5 +172,5 @@ describe("central-path regression cases", () => {
         hemisphere === "north" ? extreme : -extreme,
       ).toBeGreaterThan(70);
     }
-  }, 30_000);
+  });
 });

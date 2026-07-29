@@ -29,6 +29,7 @@
     "release:status": "changeset status --verbose",
     "release:version": "changeset version && npm run release:lockfile",
     "test": "vitest run",
+    "test:validation": "vitest run --config vitest.validation.config.ts",
     "test:browser": "playwright test",
     "typecheck": "tsc --build --pretty false && tsc --project tsconfig.tools.json --pretty false"
   },

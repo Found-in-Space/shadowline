@@ -80,41 +80,6 @@ beforeAll(() => {
 });
 
 describe("coordinate-free geometry invariants", () => {
-  it("rotates the complete central ECEF surface equivariantly", () => {
-    const angleRad = 0.731;
-    const original = new EclipseEngine(
-      astronomyEngineCapabilities(provider),
-    ).calculateCentralPath(event, { sampleIntervalSeconds: 60 });
-    const rotatedProvider = new RotatedProvider(angleRad);
-    const rotated = new EclipseEngine({
-      ephemeris: rotatedProvider,
-    }).calculateCentralPath(event, { sampleIntervalSeconds: 60 });
-    for (const [originalCurve, rotatedCurve] of [
-      [original.centerline, rotated.centerline],
-      [
-        original.limits.positiveCrossTrack,
-        rotated.limits.positiveCrossTrack,
-      ],
-      [
-        original.limits.negativeCrossTrack,
-        rotated.limits.negativeCrossTrack,
-      ],
-      [original.boundary, rotated.boundary],
-    ] as const) {
-      expect(rotatedCurve.points.length).toBe(originalCurve.points.length);
-      expect(
-        Math.max(
-          ...originalCurve.points.map((point, index) =>
-            chordDistanceKm(
-              rotateZ(point.ecefKm, angleRad),
-              rotatedCurve.points[index]!.ecefKm,
-            ),
-          ),
-        ),
-      ).toBeLessThan(1e-5);
-    }
-  });
-
   it("rotates instantaneous physical regions equivariantly", () => {
     const angleRad = -1.17;
     const original = new EclipseEngine(

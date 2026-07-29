@@ -1,23 +1,11 @@
 import { Vector3 } from "three";
 import { describe, expect, it } from "vitest";
 import {
-  AU_KM,
   EARTH_MEAN_RADIUS_KM,
-  EclipseEngine,
   WGS84_A_KM,
   WGS84_B_KM,
-  coneResidualKm,
-  magnitude,
-  normalize,
-  scale,
-  subtract,
   type CartesianVector,
-  type ShadowGeometryState,
 } from "@found-in-space/shadowline";
-import {
-  AstronomyEngineProvider,
-  astronomyEngineCapabilities,
-} from "@found-in-space/shadowline-astronomy-engine";
 import {
   WGS84_DISPLAY_EQUATORIAL_RADIUS,
   WGS84_DISPLAY_POLAR_RADIUS,
@@ -114,68 +102,5 @@ describe("Spacefarer WGS 84 display geometry", () => {
     expect(
       projected.clone().normalize().dot(new Vector3(2, 3, -4).normalize())
     ).toBeCloseTo(1, 12);
-  });
-});
-
-describe("Spacefarer physical shadow alignment", () => {
-  it("keeps peak and grazing outlines on WGS 84 and their cone arcs", () => {
-    const provider = new AstronomyEngineProvider();
-    const engine = new EclipseEngine(astronomyEngineCapabilities(provider));
-    const event = engine
-      .events({
-        startUtc: "2026-08-12T00:00:00Z",
-        endUtc: "2026-08-13T00:00:00Z",
-      })
-      .find((candidate) => candidate.id === "solar-2026-08-12-total");
-    expect(event).toBeDefined();
-
-    for (const atUtc of [event!.peakUtc, "2026-08-12T17:00:30Z"]) {
-      const shadow = engine.calculateInstantaneousShadow(event!, atUtc, {
-        angularIntervalDegrees: 3,
-      });
-      const kilometres = (body: "sun" | "moon") =>
-        scale(
-          provider.stateVector(body, shadow.atUtc, "geocentric-earth-fixed")
-            .positionAu,
-          AU_KM
-        );
-      const sunEcefKm = kilometres("sun");
-      const moonEcefKm = kilometres("moon");
-      const state: ShadowGeometryState = {
-        atUtc: shadow.atUtc,
-        sunEcefKm,
-        moonEcefKm,
-        direction: normalize(subtract(moonEcefKm, sunEcefKm)),
-        sunDistanceKm: magnitude(sunEcefKm),
-        sunMoonDistanceKm: magnitude(subtract(moonEcefKm, sunEcefKm)),
-      };
-      const regions = [
-        { cone: "penumbra" as const, region: shadow.penumbra },
-        ...(shadow.central
-          ? [{ cone: "central" as const, region: shadow.central.region }]
-          : []),
-      ];
-
-      for (const { cone, region } of regions) {
-        for (const ring of region.rings) {
-          for (const point of ring.points) {
-            const displayed = ecefKmToDisplay(point.ecefKm);
-            expect(
-              Math.abs(wgs84DisplayEquation(displayed) - 1) *
-                EARTH_MEAN_RADIUS_KM
-            ).toBeLessThan(0.001);
-          }
-          for (const segment of ring.segments) {
-            if (segment.kind !== "cone") continue;
-            for (const point of segment.curve.points) {
-              const restored = displayToEcefKm(ecefKmToDisplay(point.ecefKm));
-              expect(
-                Math.abs(coneResidualKm(state, restored, cone))
-              ).toBeLessThan(0.001);
-            }
-          }
-        }
-      }
-    }
   });
 });

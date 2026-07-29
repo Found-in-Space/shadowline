@@ -21,6 +21,10 @@ test:
     npm run check
     npm test
 
+# Run slower scientific reference and historical path regressions.
+test-validation:
+    npm run test:validation
+
 # Run the production SPA browser suite with OpenStreetMap requests stubbed.
 test-browser:
     npm run build
@@ -30,6 +34,7 @@ test-browser:
 validate:
     npm run check
     npm test
+    npm run test:validation
     npm run build
     npm run test:browser
     @echo "Validation passed"
