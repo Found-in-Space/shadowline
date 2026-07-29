@@ -47,6 +47,8 @@ type WorkerResponse =
 type ViewPreset = "system" | "earth" | "moon" | "shadow";
 
 const SUN_DISC_DISTANCE = 650;
+const siteRoot = new URL(/* @vite-ignore */ "../", import.meta.url);
+const siteAssetUrl = (name: string): string => new URL(name, siteRoot).href;
 const element = <T extends HTMLElement>(id: string): T => {
   const value = document.getElementById(id);
   if (!value) throw new Error(`Missing #${id}.`);
@@ -260,7 +262,9 @@ const earthFixedGroup = new THREE.Group();
 earthFixedGroup.matrixAutoUpdate = false;
 physicalRoot.add(earthFixedGroup);
 
-const earthTexture = new THREE.TextureLoader().load("/bluemarble-2048.png");
+const earthTexture = new THREE.TextureLoader().load(
+  siteAssetUrl("bluemarble-2048.png"),
+);
 earthTexture.colorSpace = THREE.SRGBColorSpace;
 earthTexture.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
 
@@ -343,7 +347,9 @@ function graticule(): THREE.LineSegments {
 }
 earthFixedGroup.add(graticule());
 
-const moonTexture = new THREE.TextureLoader().load("/lroc-color-2k.jpg");
+const moonTexture = new THREE.TextureLoader().load(
+  siteAssetUrl("lroc-color-2k.jpg"),
+);
 moonTexture.colorSpace = THREE.SRGBColorSpace;
 moonTexture.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
 
