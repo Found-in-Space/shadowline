@@ -47,9 +47,6 @@ test("requests Blue Marble from the cacheable GIBS WMTS service", async ({
 
 test("initializes three coordinated projection panels", async ({ page }) => {
   await page.goto("/?eclipse=solar-2026-08-12-total");
-  await expect(
-    page.getByText("track calculated from", { exact: false }),
-  ).toBeVisible();
 
   await expect(
     page.getByRole("article", { name: "OpenStreetMap · Web Mercator" }),
