@@ -10,10 +10,6 @@ export default defineConfig({
     rollupOptions: {
       input: {
         explorer: resolve(import.meta.dirname, "index.html"),
-        shadowCones: resolve(
-          import.meta.dirname,
-          "shadow-cones/index.html",
-        ),
         spacefarer: resolve(
           import.meta.dirname,
           "spacefarer/index.html",

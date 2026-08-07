@@ -368,24 +368,6 @@ h2 { margin: 0; font-size: 1.15rem; letter-spacing: -0.025em; }
 .tracker-globe .renderer-error { display: grid; place-items: center; height: 100%; padding: 30px; color: var(--muted); text-align: center; }
 .globe-status { min-height: 34px; margin: 0; padding: 9px 14px; color: var(--muted); border-top: 1px solid var(--line); font-size: 0.66rem; line-height: 1.4; }
 
-.model-link {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 14px;
-  min-height: 72px;
-  padding: 13px 15px;
-  color: var(--ink);
-  border-top: 1px solid var(--line);
-  background: linear-gradient(110deg, rgb(184 117 209 / 13%), transparent);
-  text-decoration: none;
-}
-
-.model-link span:first-child { display: grid; gap: 3px; }
-.model-link strong { font-size: 0.78rem; }
-.model-link small { color: var(--muted); font-size: 0.63rem; }
-.model-link span:last-child { color: var(--violet); font-size: 1.4rem; }
-
 .field-note,
 .accuracy-note { padding: 17px 15px; }
 .field-note p:not(.eyebrow),

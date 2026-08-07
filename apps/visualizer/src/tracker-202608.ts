@@ -77,7 +77,6 @@ const timeSlider = element<HTMLInputElement>("time-slider");
 const liveButton = element<HTMLButtonElement>("live-button");
 const contactList = element<HTMLOListElement>("contact-list");
 const globeStatus = element("globe-status");
-const modelLink = element<HTMLAnchorElement>("model-link");
 
 configureOperationalDeltaT202608();
 const worker = new TrackerWorkerClient();
@@ -292,15 +291,6 @@ function updatePreviewReadout(atMs: number): void {
   modeBadge.classList.toggle("is-preview", !followLive);
   liveButton.hidden = followLive;
   if (!followLive) timeSlider.value = String(Math.round((atMs - rangeStartMs) / 1000));
-  const modelUrl = new URL("../../shadow-cones/", location.href);
-  modelUrl.searchParams.set("at", new Date(atMs).toISOString());
-  modelUrl.searchParams.set("from", "tracker");
-  if (observer) {
-    modelUrl.searchParams.set("lat", observer.latitudeDeg.toFixed(6));
-    modelUrl.searchParams.set("lon", observer.longitudeDeg.toFixed(6));
-    modelUrl.searchParams.set("elevation", String(Math.round(observer.elevationMeters ?? 0)));
-  }
-  modelLink.href = modelUrl.href;
 }
 
 async function updateShadow(atMs: number): Promise<void> {

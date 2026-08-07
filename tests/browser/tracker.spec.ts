@@ -38,23 +38,6 @@ test("provides a mobile local eclipse field view and manual preview", async ({
   });
   await expect(page.locator("#mode-badge")).toHaveText("PREVIEW");
   await expect(page.locator("#obscuration-value")).not.toHaveText("—");
-  const modelHref = await page.getByRole("link", { name: /Explore the 3D Sun–Moon–Earth model/ }).getAttribute("href");
-  expect(new URL(modelHref!, page.url()).pathname).toBe("/shadow-cones/");
-  const modelUrl = new URL(modelHref!, page.url());
-  const modelTime = modelUrl.searchParams.get("at");
-  expect(modelTime).toMatch(/^2026-08-12T/);
-
-  const modelPage = await context.newPage();
-  await modelPage.goto(modelUrl.href);
-  await expect(modelPage.locator("#time-label")).toHaveText(
-    new Date(modelTime!).toISOString().slice(11, 19) + " UTC",
-  );
-  const returnHref = await modelPage.locator("#back-link").getAttribute("href");
-  const returnUrl = new URL(returnHref!, modelPage.url());
-  expect(returnUrl.pathname).toBe("/tracker/202608/");
-  expect(returnUrl.searchParams.get("lat")).toBe("65.141100");
-  expect(returnUrl.searchParams.get("at")).toBe(modelTime);
-  await modelPage.close();
 
   await expect(page.locator("#offline-status")).toContainText(
     "App shell ready offline",

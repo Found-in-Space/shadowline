@@ -1,5 +1,7 @@
 /// <reference lib="webworker" />
 
+// Shared physical eclipse calculations for the Spacefarer renderer.
+
 import {
   AU_KM,
   EclipseEngine,

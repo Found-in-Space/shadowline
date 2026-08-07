@@ -832,7 +832,7 @@ for (const [name, button] of Object.entries(presetButtons)) {
 }
 
 const worker = new Worker(
-  new URL("./shadow-cones-worker.ts", import.meta.url),
+  new URL("./spacefarer-worker.ts", import.meta.url),
   { type: "module" },
 );
 let eventPeakMs = Date.parse("2026-08-12T17:45:46.794Z");
