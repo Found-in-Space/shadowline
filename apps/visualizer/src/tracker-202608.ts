@@ -177,7 +177,7 @@ function globalContacts(scene: EclipseScene): NamedContact[] {
   const last = scene.contacts.at(-1);
   return [
     ...(first ? [{ key: "P1" as const, label: "Eclipse begins somewhere on Earth", utc: first.utc }] : []),
-    { key: "MAX", label: "Greatest eclipse", utc: scene.event.peakUtc },
+    { key: "MAX", label: "Eclipse at its greatest", utc: scene.event.peakUtc },
     ...(last ? [{ key: "P4" as const, label: "Eclipse ends on Earth", utc: last.utc }] : []),
   ];
 }
@@ -386,7 +386,7 @@ async function setObserver(
           ? "Location chosen on the map"
           : "Entered location";
   locationCoordinates.textContent = coordinates(nextObserver);
-  locationMessage.textContent = "Calculating the eclipse times for this location…";
+  locationMessage.textContent = "Working out what the eclipse will look like here…";
   latitudeInput.value = String(nextObserver.latitudeDeg);
   longitudeInput.value = String(nextObserver.longitudeDeg);
   elevationInput.value = String(nextObserver.elevationMeters ?? 0);
@@ -416,7 +416,7 @@ async function setObserver(
         { ...nextObserver, elevationMeters },
         source,
         false,
-        `Height estimated from the terrain map: ${Math.round(elevationMeters)} m above sea level.`,
+        `The terrain map puts this location about ${Math.round(elevationMeters)} m above sea level.`,
       );
     }).catch(() => {
       // Local circumstances already use the supplied height, so terrain
@@ -440,7 +440,7 @@ async function setObserver(
     if (version !== locationVersion) return;
     console.error(error);
     localCalculationPending = false;
-    locationMessage.textContent = "We could not calculate the eclipse times. Try again or choose another location.";
+    locationMessage.textContent = "We could not work out the eclipse times. Try again or choose another location.";
   }
 }
 
@@ -576,7 +576,7 @@ async function initializeModel(): Promise<void> {
     globe.showGlobalVisibility(result.scene);
     globe.showPeak(result.event.peakLocation?.latitudeDeg, result.event.peakLocation?.longitudeDeg);
     globe.fitPath();
-    globeStatus.textContent = "Purple marks the path of totality. The shaded areas show where the Moon covers some or all of the Sun at the selected time.";
+    globeStatus.textContent = "Purple shows where the Sun will be completely covered. The shaded areas show where the Moon will cover part or all of the Sun at the chosen time.";
     updateRange();
     renderFrame();
     const urlObserver = observerFromUrl();
@@ -629,7 +629,7 @@ async function syncClock(): Promise<void> {
     if (!best) {
       if (clockSource === "device") {
         clockStatus.textContent = "Using device time";
-        clockDetail.textContent = "We could not check the time online, so the countdown is using this device’s clock.";
+        clockDetail.textContent = "The online time check did not work, so the countdown is using this device’s clock.";
       }
       return;
     }
@@ -672,7 +672,7 @@ async function prepareOffline(): Promise<void> {
     });
     if (navigator.onLine) await registration.update();
     await navigator.serviceWorker.ready;
-    offlineStatus.textContent = "Ready to work offline. Maps and height information are saved as you view them.";
+    offlineStatus.textContent = "Ready for a poor connection. Places you view on the map will be saved as you go.";
   } catch {
     offlineStatus.textContent = "Offline setup did not finish. Keep this page open if your connection may drop.";
   }

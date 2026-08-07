@@ -371,7 +371,9 @@ h2 { margin: 0; font-size: 1.15rem; letter-spacing: -0.025em; }
 .accuracy-note { padding: 17px 15px; }
 .field-note p:not(.eyebrow),
 .accuracy-note p { color: var(--muted); font-size: 0.73rem; line-height: 1.55; }
-.field-note p:last-child { margin-bottom: 0; color: #bdf7ed; font-weight: 750; }
+.field-note #offline-status { color: #bdf7ed; font-weight: 750; }
+.field-note .project-credit { margin-bottom: 0; padding-top: 10px; border-top: 1px solid var(--line); }
+.field-note .project-credit a { color: var(--gold); }
 .accuracy-note summary { cursor: pointer; font-size: 0.84rem; font-weight: 850; }
 .accuracy-note a { color: var(--gold); }
 .accuracy-note p:last-child { margin-bottom: 0; }

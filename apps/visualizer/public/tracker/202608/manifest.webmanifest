@@ -1,7 +1,7 @@
 {
-  "name": "Shadowline — 12 August 2026 Eclipse Tracker",
+  "name": "Found in Space — 12 August 2026 Eclipse Tracker",
   "short_name": "Eclipse 2026",
-  "description": "Eclipse times and a live preview for your location, built to keep working with a poor connection.",
+  "description": "Follow the Moon’s shadow and preview the 12 August 2026 eclipse from your location, even with a poor connection.",
   "id": "./",
   "lang": "en",
   "start_url": "./",
@@ -18,5 +18,5 @@
       "purpose": "any maskable"
     }
   ],
-  "categories": ["weather", "navigation", "utilities"]
+  "categories": ["education", "navigation", "utilities"]
 }

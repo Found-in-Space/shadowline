@@ -8,28 +8,28 @@
     >
     <meta
       name="description"
-      content="Eclipse times and a live preview for wherever you are, designed to keep working with a poor connection."
+      content="Follow the Moon’s shadow and see what the 12 August 2026 eclipse will look like where you are, even with a poor connection."
     >
     <meta property="og:type" content="website">
-    <meta property="og:title" content="12 August 2026 Eclipse Tracker — Shadowline">
-    <meta property="og:description" content="See the eclipse times and what the Sun will look like from your location, even when your connection is unreliable.">
+    <meta property="og:title" content="12 August 2026 Eclipse Tracker — Found in Space">
+    <meta property="og:description" content="Follow the Moon’s shadow, see your eclipse times and preview what the Sun will look like where you are.">
     <meta property="og:image" content="./og.png">
     <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="12 August 2026 Eclipse Tracker — Shadowline">
-    <meta name="twitter:description" content="Eclipse times and a live preview for your location, built for use in the field.">
+    <meta name="twitter:title" content="12 August 2026 Eclipse Tracker — Found in Space">
+    <meta name="twitter:description" content="Follow the Moon’s shadow and preview the eclipse from your location.">
     <meta name="twitter:image" content="./og.png">
     <meta name="theme-color" content="#090d17">
     <link rel="icon" href="./icon.svg" type="image/svg+xml">
     <link rel="manifest" href="./manifest.webmanifest">
-    <title>12 August 2026 Eclipse Tracker — Shadowline</title>
+    <title>12 August 2026 Eclipse Tracker — Found in Space</title>
   </head>
   <body>
     <a class="skip-link" href="#live-panel">Skip to eclipse times</a>
 
     <header class="tracker-header">
-      <a class="brand" href="../../" aria-label="Shadowline home">
+      <a class="brand" href="../../" aria-label="Found in Space eclipse explorer">
         <span class="brand-mark" aria-hidden="true"></span>
-        <span><small>foundin.space</small><strong>Shadowline tracker</strong></span>
+        <span><small>foundin.space</small><strong>Eclipse tracker</strong></span>
       </a>
       <div class="connection-state" aria-live="polite">
         <span id="network-status" class="status-chip">Checking network</span>
@@ -51,7 +51,7 @@
           <div>
             <p id="location-heading" class="micro-label">Your location</p>
             <strong id="location-label">Choose a location to see your eclipse times</strong>
-            <span id="location-coordinates">We will start with a rough location based on your internet connection. Use GPS or enter a location for accurate times.</span>
+            <span id="location-coordinates">We can start with a rough location. Use GPS or enter a checked location before relying on the times.</span>
           </div>
           <div class="location-actions">
             <button id="gps-button" class="primary-button" type="button">Use my GPS</button>
@@ -61,7 +61,7 @@
             <label>Latitude <input id="latitude-input" type="number" min="-90" max="90" step="any" inputmode="decimal" required></label>
             <label>Longitude <input id="longitude-input" type="number" min="-180" max="180" step="any" inputmode="decimal" required></label>
             <label>Height above sea level (m) <input id="elevation-input" type="number" min="-500" max="100000" step="1" inputmode="numeric" placeholder="Estimated if online"></label>
-            <button class="primary-button" type="submit">Use these coordinates</button>
+            <button class="primary-button" type="submit">Use this location</button>
           </form>
           <p id="location-message" class="inline-message" role="status" aria-live="polite"></p>
         </section>
@@ -122,27 +122,28 @@
       <aside class="overview-column">
         <section class="globe-card" aria-labelledby="globe-heading">
           <div class="globe-heading">
-            <div><p class="eyebrow">The Moon’s moving shadow</p><h2 id="globe-heading">Where the shadow is</h2></div>
-            <span class="drag-hint">Drag to move · tap to choose a location</span>
+            <div><p class="eyebrow">The Moon’s moving shadow</p><h2 id="globe-heading">Watch it cross Earth</h2></div>
+            <span class="drag-hint">Drag to explore · tap to choose a location</span>
           </div>
           <div id="tracker-globe" class="tracker-globe" tabindex="0"></div>
           <p id="globe-status" class="globe-status" role="status">Working out the eclipse path…</p>
         </section>
 
         <section class="field-note" aria-labelledby="field-note-heading">
-          <p class="eyebrow">Field notes</p>
-          <h2 id="field-note-heading">Built to keep working</h2>
-          <p>Once this page has loaded, it can keep calculating if your connection drops. Maps and height information are saved as you view them. GPS does not need mobile data.</p>
-          <p>Your starting location may be guessed from your internet connection. It is only a rough guess: use GPS or enter a checked location before relying on the times.</p>
+          <p class="eyebrow">For eclipse day</p>
+          <h2 id="field-note-heading">Made for the moment</h2>
+          <p>Open this page before you set out. Once it has loaded, it can keep calculating if your signal drops. Places you view on the map are saved as you go, and GPS does not need mobile data.</p>
+          <p>We may begin with a rough guess at your location. Before relying on the times, use GPS or enter a location you have checked.</p>
           <p id="offline-status">Preparing this page for offline use…</p>
+          <p class="project-credit">An open <a href="https://foundin.space/">Found in Space</a> project by <a href="https://www.k-si.com/">Kaj Siebert</a>.</p>
         </section>
 
         <details class="accuracy-note">
-          <summary>How accurate are these times?</summary>
-          <p>The times are calculated for the latitude, longitude and height shown above. The calculation includes the shape of Earth and its predicted rotation on 12 August 2026.</p>
-          <p>If GPS does not give us your height, we may estimate it from a terrain map while you are online. The calculation treats the edge of the Moon as smooth, but real mountains and valleys on the Moon can change the first and last flashes of sunlight by a few seconds. Nearby hills and buildings that block your view are not included.</p>
-          <p>Use GPS or checked coordinates for the final times, and be ready at least a minute early.</p>
-          <p id="clock-detail">The countdown is using this device’s clock until it can check the time online.</p>
+          <summary>What this prediction can—and can’t—show</summary>
+          <p>These times and views are predictions, not direct observations. They are calculated for the location and height shown above, using the shape of Earth and how it is expected to turn on eclipse day.</p>
+          <p>If GPS cannot find your height, we may estimate it from a terrain map while you are online. The model gives the Moon a smooth edge. Its real mountains and valleys can shift the first and last flashes of sunlight by a few seconds. It also cannot see nearby hills, buildings or clouds that may block your view.</p>
+          <p>Use GPS or a checked location for the final times. Treat the prediction as a guide, be ready at least a minute early, and keep watching.</p>
+          <p id="clock-detail">The countdown is using this device’s clock. When online, it will check the time and correct it if needed.</p>
         </details>
       </aside>
     </main>

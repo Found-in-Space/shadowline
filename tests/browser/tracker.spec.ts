@@ -22,8 +22,17 @@ test("provides a mobile local eclipse field view and manual preview", async ({
   await expect(
     page.getByRole("heading", { name: "12 August 2026" }),
   ).toBeVisible();
+  await expect(page).toHaveTitle(/Found in Space/);
+  await expect(page.getByText("Eclipse tracker", { exact: true })).toBeVisible();
+  await expect(
+    page.getByText("What this prediction can—and can’t—show", { exact: true }),
+  ).toBeVisible();
+  await expect(page.locator('a[href="https://www.k-si.com/"]')).toHaveText(
+    "Kaj Siebert",
+  );
   await expect(page.getByText("You can see totality from this location.")).toBeVisible();
   await expect(page.locator('a[href*="shadow-cones"]')).toHaveCount(0);
+  await expect(page.locator("body")).not.toContainText("Shadowline tracker");
   await expect(page.locator("#contact-list li")).toHaveCount(5);
   await expect(page.locator("#tracker-globe")).toHaveAttribute(
     "data-renderer-ready",
@@ -41,7 +50,7 @@ test("provides a mobile local eclipse field view and manual preview", async ({
   await expect(page.locator("#obscuration-value")).not.toHaveText("—");
 
   await expect(page.locator("#offline-status")).toContainText(
-    "Ready to work offline",
+    "Ready for a poor connection",
   );
   await context.setOffline(true);
   await page.reload({ waitUntil: "domcontentloaded" });
@@ -77,7 +86,7 @@ test("refines a missing observer elevation without blocking contacts", async ({
   await page.goto("/tracker/202608/?lat=65.1411&lon=-25.3272");
 
   await expect(page.locator("#location-message")).toContainText(
-    "Height estimated from the terrain map: 2 m above sea level.",
+    "The terrain map puts this location about 2 m above sea level.",
   );
   await expect(page.locator("#contact-list li")).toHaveCount(5);
   await context.close();
