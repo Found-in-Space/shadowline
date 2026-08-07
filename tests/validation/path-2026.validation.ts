@@ -73,6 +73,93 @@ const checkpoints = {
   },
 } as const;
 
+// Sea-level local circumstances from the NASA GSFC MapLibre calculator:
+// https://eclipse.gsfc.nasa.gov/SEsearch/SEsearchmap.php?Ecl=20260812
+// Its published Besselian elements use VSOP87/ELP2000-82 and ΔT = 75.4 s.
+const localCheckpoints = [
+  {
+    name: "greatest eclipse",
+    observer: { latitudeDeg: 65.225, longitudeDeg: -25.228333 },
+    kind: "total",
+    obscuration: 1,
+    contacts: {
+      partialBegin: "16:43:45.0",
+      centralBegin: "17:44:40.8",
+      peak: "17:45:50.0",
+      centralEnd: "17:46:59.0",
+      partialEnd: "18:45:18.4",
+    },
+  },
+  {
+    name: "Spanish centreline",
+    observer: { latitudeDeg: 41.8166667, longitudeDeg: -3.185 },
+    kind: "total",
+    obscuration: 1,
+    contacts: {
+      partialBegin: "17:34:14.6",
+      centralBegin: "18:29:04.3",
+      peak: "18:29:56.7",
+      centralEnd: "18:30:48.9",
+      partialEnd: "19:22:11.8",
+    },
+  },
+  {
+    name: "Reykjavik",
+    observer: { latitudeDeg: 64.1466, longitudeDeg: -21.9426 },
+    kind: "total",
+    obscuration: 1,
+    contacts: {
+      partialBegin: "16:47:07.7",
+      centralBegin: "17:48:11.1",
+      peak: "17:48:41.8",
+      centralEnd: "17:49:12.4",
+      partialEnd: "18:47:33.5",
+    },
+  },
+  {
+    name: "London",
+    observer: { latitudeDeg: 51.5074, longitudeDeg: -0.1278 },
+    kind: "partial",
+    obscuration: 0.9136,
+    contacts: {
+      partialBegin: "17:17:14.5",
+      peak: "18:13:15.2",
+      partialEnd: "19:06:15.6",
+    },
+  },
+  {
+    name: "Amsterdam",
+    observer: { latitudeDeg: 52.3676, longitudeDeg: 4.9041 },
+    kind: "partial",
+    obscuration: 0.882,
+    contacts: {
+      partialBegin: "17:16:02.0",
+      peak: "18:10:52.3",
+      partialEnd: "19:02:57.3",
+    },
+  },
+  {
+    name: "New York",
+    observer: { latitudeDeg: 40.7128, longitudeDeg: -74.006 },
+    kind: "partial",
+    obscuration: 0.0944,
+    contacts: {
+      partialBegin: "17:07:41.1",
+      peak: "17:54:01.2",
+      partialEnd: "18:38:44.1",
+    },
+  },
+] as const;
+
+function contactErrorSeconds(actualUtc: string, expectedTime: string): number {
+  return (
+    Math.abs(
+      Date.parse(actualUtc) -
+        Date.parse(`2026-08-12T${expectedTime}Z`),
+    ) / 1000
+  );
+}
+
 function position(point: SurfacePoint): Position {
   return [
     point.geographic.longitudeDeg,
@@ -264,6 +351,73 @@ describe("2026 planning-grade ECEF path", () => {
         Math.abs(horizontal.azimuthDeg - checkpoint.azimuthDeg),
       ).toBeLessThan(1);
     }
+  });
+
+  it("matches NASA local contacts and obscuration across the penumbra", () => {
+    for (const checkpoint of localCheckpoints) {
+      const local = engine.localCircumstances(event, {
+        ...checkpoint.observer,
+        elevationMeters: 0,
+      });
+      expect(local, checkpoint.name).not.toBeNull();
+      expect(local!.kind, checkpoint.name).toBe(checkpoint.kind);
+      expect(
+        Math.abs(local!.obscuration - checkpoint.obscuration),
+        checkpoint.name,
+      ).toBeLessThan(0.001);
+      expect(
+        contactErrorSeconds(
+          local!.partialBegin.utc,
+          checkpoint.contacts.partialBegin,
+        ),
+        `${checkpoint.name} C1`,
+      ).toBeLessThan(12);
+      expect(
+        contactErrorSeconds(local!.peak.utc, checkpoint.contacts.peak),
+        `${checkpoint.name} maximum`,
+      ).toBeLessThan(12);
+      expect(
+        contactErrorSeconds(
+          local!.partialEnd.utc,
+          checkpoint.contacts.partialEnd,
+        ),
+        `${checkpoint.name} C4`,
+      ).toBeLessThan(12);
+      if (
+        "centralBegin" in checkpoint.contacts &&
+        "centralEnd" in checkpoint.contacts
+      ) {
+        expect(local!.centralBegin, `${checkpoint.name} C2`).toBeDefined();
+        expect(local!.centralEnd, `${checkpoint.name} C3`).toBeDefined();
+        expect(
+          contactErrorSeconds(
+            local!.centralBegin!.utc,
+            checkpoint.contacts.centralBegin,
+          ),
+          `${checkpoint.name} C2`,
+        ).toBeLessThan(12);
+        expect(
+          contactErrorSeconds(
+            local!.centralEnd!.utc,
+            checkpoint.contacts.centralEnd,
+          ),
+          `${checkpoint.name} C3`,
+        ).toBeLessThan(12);
+      } else {
+        expect(local!.centralBegin, checkpoint.name).toBeUndefined();
+        expect(local!.centralEnd, checkpoint.name).toBeUndefined();
+      }
+    }
+  });
+
+  it("does not report the eclipse outside its penumbral visibility", () => {
+    expect(
+      engine.localCircumstances(event, {
+        latitudeDeg: -33.8688,
+        longitudeDeg: 151.2093,
+        elevationMeters: 0,
+      }),
+    ).toBeNull();
   });
 
   it("keeps swept surface widths in the published tolerance", () => {

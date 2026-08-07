@@ -278,20 +278,35 @@ view; it must not replace the canonical coordinates.
 
 ## Accuracy and validation
 
-This is a **planning-grade, centre-of-figure** model. Astronomy Engine uses a
-compact VSOP87/NOVAS-derived ephemeris designed for approximately one-arcminute
+This is a **planning-grade, smooth-limb** model. Astronomy Engine uses a compact
+VSOP87/NOVAS-derived ephemeris designed for approximately one-arcminute
 astronomical accuracy. The path implementation is tested against NASA's WGS 84
-table for 12 August 2026:
+table and MapLibre local-circumstances calculator for 12 August 2026:
 
 - interior centre and limit checkpoints within 25 km;
+- local C1/C2/maximum/C3/C4 contacts within 12 seconds at representative total
+  and partial locations;
+- maximum obscuration within 0.1 percentage point at those locations;
 - local maximum within 10 seconds;
 - central duration within 3 seconds;
 - solar altitude and azimuth within 1 degree.
 
-Accuracy degrades over long historical/future timescales as ΔT becomes
-uncertain. Lunar mountains and valleys are not modelled and can move practical
-limits by kilometres. The results are not suitable for surveying,
-safety-critical navigation, or sub-second scientific prediction.
+The local percentage is maximum obscuration, not obscuration at an arbitrary
+instant. Observer elevation is supported when callers provide it, but the map
+application currently selects sea-level locations. Neither an Earth terrain
+model, a local terrain horizon, nor lunar limb topography is included. Lunar
+mountains and valleys can move practical limits by kilometres and contact times
+by several seconds.
+
+Astronomy Engine's default Espenak–Meeus polynomial evaluates to ΔT ≈ 75.43 s
+at the August 2026 eclipse. Shadowline does not fetch current IERS Earth
+orientation data or override that default. A dated, operational prediction
+should supply current Earth-orientation data through a provider when seconds or
+kilometres matter; the default remains useful for deterministic planning and
+comparison with NASA's published 75.4-second Besselian-element calculator.
+Accuracy also degrades over long historical/future timescales as ΔT becomes
+uncertain. The results are not suitable for surveying, safety-critical
+navigation, or sub-second scientific prediction.
 
 See `NOTICE.md` for source acknowledgements and third-party licences.
 

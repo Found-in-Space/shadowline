@@ -8,6 +8,9 @@ published by Fred Espenak:
 
 - WGS 84 path table for the total solar eclipse of 12 August 2026  
   `https://eclipse.gsfc.nasa.gov/SEpath/SEpath2001/SE2026Aug12Tpath.html`
+- MapLibre local-circumstances calculator for the total solar eclipse of
+  12 August 2026
+  `https://eclipse.gsfc.nasa.gov/SEsearch/SEsearchmap.php?Ecl=20260812`
 - WGS 84 path table and Besselian elements for the total solar eclipse of
   30 June 1973:
   `https://eclipse.gsfc.nasa.gov/SEpath/SEpath1951/SE1973Jun30Tpath.html`
@@ -90,3 +93,15 @@ this repository. GIBS documentation is available at
 We acknowledge the use of imagery provided by services from NASA's Global
 Imagery Browse Services (GIBS), part of NASA's Earth Observing System Data and
 Information System (EOSDIS).
+
+## Mapterhorn and Copernicus GLO-30
+
+The eclipse tracker may request a single runtime terrain sample from
+Mapterhorn's public global zoom 3-12 Terrarium WebP endpoint when an observing
+location has no supplied elevation:
+`https://tiles.mapterhorn.com/{z}/{x}/{y}.webp`
+
+Terrain data is © Mapterhorn and is derived from Copernicus GLO-30. Current
+source attribution and licence information is published at
+`https://mapterhorn.com/attribution/` and
+`https://dataspace.copernicus.eu/explore-data/data-collections/copernicus-contributing-missions/collections-description/COP-DEM`.

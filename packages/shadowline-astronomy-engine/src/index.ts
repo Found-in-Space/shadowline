@@ -266,7 +266,7 @@ export class AstronomyEngineProvider
     id: "astronomy-engine",
     name: "Astronomy Engine",
     version: VERSION,
-    model: "VSOP87/NOVAS-derived compact ephemeris; centre-of-figure Moon",
+    model: "VSOP87/NOVAS-derived compact ephemeris; smooth spherical Moon",
     accuracy: "planning",
   };
 

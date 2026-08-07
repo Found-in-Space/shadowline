@@ -1,0 +1,22 @@
+{
+  "name": "Shadowline — 12 August 2026 Eclipse Tracker",
+  "short_name": "Eclipse 2026",
+  "description": "Offline-ready local circumstances for the 12 August 2026 total solar eclipse.",
+  "id": "./",
+  "lang": "en",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#090d17",
+  "theme_color": "#090d17",
+  "icons": [
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["weather", "navigation", "utilities"]
+}

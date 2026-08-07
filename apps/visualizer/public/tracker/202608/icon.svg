@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Shadowline eclipse tracker">
+  <rect width="512" height="512" rx="112" fill="#090d17"/>
+  <circle cx="256" cy="256" r="154" fill="#ffca68"/>
+  <circle cx="298" cy="224" r="151" fill="#111827"/>
+  <path d="M82 390c92-62 252-70 348-14" fill="none" stroke="#b875d1" stroke-width="30" stroke-linecap="round"/>
+  <circle cx="344" cy="366" r="18" fill="#63d6c8" stroke="#090d17" stroke-width="10"/>
+</svg>

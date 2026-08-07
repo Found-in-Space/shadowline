@@ -18,6 +18,10 @@ export default defineConfig({
           import.meta.dirname,
           "spacefarer/index.html",
         ),
+        tracker202608: resolve(
+          import.meta.dirname,
+          "tracker/202608/index.html",
+        ),
       },
     },
   },

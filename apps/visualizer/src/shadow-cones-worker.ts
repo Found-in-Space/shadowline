@@ -20,6 +20,7 @@ import {
 import {
   earthFixedToEquatorialJ2000Basis,
 } from "./celestial-frame.js";
+import { configureOperationalDeltaT202608 } from "./tracker-astronomy.js";
 
 interface FrameRequest {
   type: "frame";
@@ -34,6 +35,7 @@ interface RangeRequest {
 
 type WorkerRequest = FrameRequest | RangeRequest;
 
+configureOperationalDeltaT202608();
 const provider = new AstronomyEngineProvider();
 const engine = new EclipseEngine(astronomyEngineCapabilities(provider));
 const eclipseEvent = engine

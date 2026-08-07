@@ -1,6 +1,20 @@
 Shadowline visualizer third-party licences
 ==========================================
 
+Mapterhorn terrain tiles and Copernicus GLO-30
+-----------------------------------------------
+
+The eclipse tracker may request local elevation at runtime from Mapterhorn's
+public Terrarium WebP tile endpoint:
+https://tiles.mapterhorn.com/{z}/{x}/{y}.webp
+
+© Mapterhorn. The current source-level attribution catalog is available at:
+https://mapterhorn.com/attribution/
+
+The global 30 m source is Copernicus GLO-30. Product information and licence
+terms are available at:
+https://dataspace.copernicus.eu/explore-data/data-collections/copernicus-contributing-missions/collections-description/COP-DEM
+
 Leaflet 1.9.4
 -------------
 

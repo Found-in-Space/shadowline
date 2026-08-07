@@ -60,6 +60,24 @@ const moonDistance = element<HTMLElement>("moon-distance");
 const sunDistance = element<HTMLElement>("sun-distance");
 const readableModeButton = element<HTMLButtonElement>("readable-mode");
 const affineModeButton = element<HTMLButtonElement>("affine-mode");
+const backLink = element<HTMLAnchorElement>("back-link");
+const query = new URL(location.href).searchParams;
+const requestedTimeMs = Date.parse(query.get("at") ?? "");
+
+if (query.get("from") === "tracker") {
+  const returnUrl = new URL("../tracker/202608/", location.href);
+  for (const key of ["lat", "lon", "elevation"] as const) {
+    const value = query.get(key);
+    if (value !== null) returnUrl.searchParams.set(key, value);
+  }
+  if (Number.isFinite(requestedTimeMs)) {
+    returnUrl.searchParams.set("at", new Date(requestedTimeMs).toISOString());
+  }
+  backLink.href = returnUrl.href;
+  backLink.setAttribute("aria-label", "Back to the Shadowline eclipse tracker");
+  const label = backLink.querySelector("span:last-child");
+  if (label) label.textContent = "Eclipse tracker";
+}
 
 const renderer = new THREE.WebGLRenderer({
   antialias: true,
@@ -567,7 +585,9 @@ worker.addEventListener("message", (message: MessageEvent<WorkerResponse>) => {
     eventPeakMs = Date.parse(response.event.peakUtc);
     rangeStartMs = eventPeakMs - 58 * 60 * 1000;
     rangeEndMs = eventPeakMs + 58 * 60 * 1000;
-    currentTimeMs = eventPeakMs;
+    currentTimeMs = Number.isFinite(requestedTimeMs)
+      ? Math.max(rangeStartMs, Math.min(rangeEndMs, requestedTimeMs))
+      : eventPeakMs;
     timeSlider.max = String((rangeEndMs - rangeStartMs) / 1000);
     timeSlider.value = String((currentTimeMs - rangeStartMs) / 1000);
     requestFrame(currentTimeMs);
