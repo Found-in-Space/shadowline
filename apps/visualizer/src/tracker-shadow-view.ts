@@ -78,6 +78,15 @@ function perpendicularBasis(
   return [first, second];
 }
 
+function northwardLift(axis: THREE.Vector3): THREE.Vector3 {
+  const north = new THREE.Vector3(0, 1, 0);
+  const lift = north.addScaledVector(axis, -north.dot(axis));
+  if (lift.lengthSq() < 1e-6) {
+    return perpendicularBasis(axis)[0];
+  }
+  return lift.normalize();
+}
+
 function coneSurface(
   start: THREE.Vector3,
   axis: THREE.Vector3,
@@ -422,7 +431,9 @@ export class TrackerShadowView {
     for (const [name, button] of Object.entries(this.cameraPresetButtons)) {
       button.setAttribute("aria-pressed", String(name === preset));
     }
-    const [side, up] = perpendicularBasis(this.shadowAxis);
+    const [side] = perpendicularBasis(this.shadowAxis);
+    const up = northwardLift(this.shadowAxis);
+    this.camera.up.copy(up);
     if (preset === "system") {
       const separation = Math.max(1, this.moonPosition.length());
       const target = this.moonPosition.clone().multiplyScalar(0.5);
@@ -432,11 +443,12 @@ export class TrackerShadowView {
         .addScaledVector(up, separation * 0.35);
       this.controls.target.copy(target);
     } else {
+      // Look from the Sun-facing side of Earth, almost directly along the
+      // shadow axis. A small lift keeps the camera just above the umbra.
       this.camera.position
-        .copy(side)
-        .multiplyScalar(7.4)
-        .addScaledVector(up, 3.2)
-        .addScaledVector(this.shadowAxis, -0.7);
+        .copy(this.shadowAxis)
+        .multiplyScalar(-7.4)
+        .addScaledVector(up, 0.55);
       this.controls.target.set(0, 0, 0);
     }
     this.camera.near = preset === "system" ? 0.05 : 0.02;
