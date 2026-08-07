@@ -245,10 +245,10 @@ async function ensureMercator(): Promise<LeafletMercatorRenderer> {
     zoom: observer ? 5 : 2,
   });
   mercator.setLayerVisibility({
-    centralPath: true,
-    partialExtent: true,
-    horizonLimits: true,
-    contacts: true,
+    centralPath: false,
+    partialExtent: false,
+    horizonLimits: false,
+    contacts: false,
     localPenumbra: true,
     localCentralShadow: true,
     centerAndLimits: true,
@@ -259,11 +259,6 @@ async function ensureMercator(): Promise<LeafletMercatorRenderer> {
   };
   if (overviewScene) {
     mercator.showPath(overviewScene);
-    mercator.showGlobalVisibility(overviewScene);
-    mercator.showPeak(
-      event?.peakLocation?.latitudeDeg,
-      event?.peakLocation?.longitudeDeg,
-    );
     if (!observer) mercator.fitPath();
   }
   if (instantaneousScene) mercator.showShadowOutline(instantaneousScene);
@@ -851,8 +846,6 @@ async function initializeModel(): Promise<void> {
     globe.fitPath();
     globe.showPeak(undefined, undefined);
     mercator?.showPath(result.scene);
-    mercator?.showGlobalVisibility(result.scene);
-    mercator?.showPeak(result.event.peakLocation?.latitudeDeg, result.event.peakLocation?.longitudeDeg);
     globeOverviewStatus = "Purple shows where the Sun will be completely covered. The shaded areas show where the Moon will cover part or all of the Sun at the chosen time.";
     showOverviewStatus();
     updateRange();

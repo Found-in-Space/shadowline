@@ -92,10 +92,6 @@ test("provides a mobile local eclipse field view and manual preview", async ({
     .poll(async () => Number((await page.locator("#tracker-map").getAttribute("data-path-feature-count")) ?? 0))
     .toBeGreaterThan(0);
   for (const layer of [
-    "central-path",
-    "partial-extent",
-    "horizon-limits",
-    "contacts",
     "center-and-limits",
     "local-penumbra",
     "local-central-shadow",
@@ -105,9 +101,21 @@ test("provides a mobile local eclipse field view and manual preview", async ({
       "true",
     );
   }
+  for (const layer of [
+    "central-path",
+    "partial-extent",
+    "horizon-limits",
+    "contacts",
+    "time-markers",
+  ]) {
+    await expect(page.locator("#tracker-map")).toHaveAttribute(
+      `data-layer-${layer}`,
+      "false",
+    );
+  }
   await expect(page.locator("#tracker-map")).toHaveAttribute(
-    "data-layer-time-markers",
-    "false",
+    "data-global-feature-count",
+    "0",
   );
   await expect
     .poll(async () => Number((await page.locator("#tracker-map").getAttribute("data-shadow-feature-count")) ?? 0))
