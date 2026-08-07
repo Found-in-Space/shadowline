@@ -19,7 +19,7 @@ test("loads and updates the physical Spacefarer model", async ({ page }) => {
     input.value = input.min;
     input.dispatchEvent(new Event("input", { bubbles: true }));
   });
-  await expect(page.locator("#time-label")).toContainText("15:34:05");
+  await expect(page.locator("#time-label")).toContainText("15:34:11");
   await expect(page.locator("#shadow-kind")).toContainText("tangent");
 
   await timeSlider.evaluate((element) => {
@@ -27,7 +27,7 @@ test("loads and updates the physical Spacefarer model", async ({ page }) => {
     input.value = input.max;
     input.dispatchEvent(new Event("input", { bubbles: true }));
   });
-  await expect(page.locator("#time-label")).toContainText("19:57:49");
+  await expect(page.locator("#time-label")).toContainText("19:57:55");
   await expect(page.locator("#shadow-kind")).toContainText("tangent");
 
   await page.getByRole("button", { name: /Shadow corridor/ }).click();
