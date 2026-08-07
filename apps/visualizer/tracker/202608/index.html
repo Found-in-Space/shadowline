@@ -8,15 +8,15 @@
     >
     <meta
       name="description"
-      content="A location-aware, offline-ready field tracker for the 12 August 2026 total solar eclipse."
+      content="Eclipse times and a live preview for wherever you are, designed to keep working with a poor connection."
     >
     <meta property="og:type" content="website">
     <meta property="og:title" content="12 August 2026 Eclipse Tracker — Shadowline">
-    <meta property="og:description" content="Live local eclipse timing, contacts, solar-disc preview, and moving-shadow overview — prepared for unreliable field connectivity.">
+    <meta property="og:description" content="See the eclipse times and what the Sun will look like from your location, even when your connection is unreliable.">
     <meta property="og:image" content="./og.png">
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="12 August 2026 Eclipse Tracker — Shadowline">
-    <meta name="twitter:description" content="Live local eclipse timing and an offline-ready field preview.">
+    <meta name="twitter:description" content="Eclipse times and a live preview for your location, built for use in the field.">
     <meta name="twitter:image" content="./og.png">
     <meta name="theme-color" content="#090d17">
     <link rel="icon" href="./icon.svg" type="image/svg+xml">
@@ -24,7 +24,7 @@
     <title>12 August 2026 Eclipse Tracker — Shadowline</title>
   </head>
   <body>
-    <a class="skip-link" href="#live-panel">Skip to live circumstances</a>
+    <a class="skip-link" href="#live-panel">Skip to eclipse times</a>
 
     <header class="tracker-header">
       <a class="brand" href="../../" aria-label="Shadowline home">
@@ -33,7 +33,7 @@
       </a>
       <div class="connection-state" aria-live="polite">
         <span id="network-status" class="status-chip">Checking network</span>
-        <span id="clock-status" class="status-chip">Device clock</span>
+        <span id="clock-status" class="status-chip">Using device time</span>
       </div>
     </header>
 
@@ -49,18 +49,18 @@
 
         <section class="location-card" aria-labelledby="location-heading">
           <div>
-            <p id="location-heading" class="micro-label">Your observing position</p>
-            <strong id="location-label">Choose a location for local predictions</strong>
-            <span id="location-coordinates">GPS works without a data connection; an approximate network location is used when available.</span>
+            <p id="location-heading" class="micro-label">Your location</p>
+            <strong id="location-label">Choose a location to see your eclipse times</strong>
+            <span id="location-coordinates">We will start with a rough location based on your internet connection. Use GPS or enter a location for accurate times.</span>
           </div>
           <div class="location-actions">
             <button id="gps-button" class="primary-button" type="button">Use my GPS</button>
-            <button id="manual-toggle" class="quiet-button" type="button" aria-expanded="false" aria-controls="manual-location">Enter manually</button>
+            <button id="manual-toggle" class="quiet-button" type="button" aria-expanded="false" aria-controls="manual-location">Enter a location</button>
           </div>
           <form id="manual-location" class="manual-location" hidden>
             <label>Latitude <input id="latitude-input" type="number" min="-90" max="90" step="any" inputmode="decimal" required></label>
             <label>Longitude <input id="longitude-input" type="number" min="-180" max="180" step="any" inputmode="decimal" required></label>
-            <label>Elevation (m) <input id="elevation-input" type="number" min="-500" max="100000" step="1" inputmode="numeric" placeholder="Auto if online"></label>
+            <label>Height above sea level (m) <input id="elevation-input" type="number" min="-500" max="100000" step="1" inputmode="numeric" placeholder="Estimated if online"></label>
             <button class="primary-button" type="submit">Use these coordinates</button>
           </form>
           <p id="location-message" class="inline-message" role="status" aria-live="polite"></p>
@@ -71,21 +71,21 @@
             <p id="countdown-heading" class="micro-label">Next at this location</p>
             <strong id="next-event-label" class="next-event-label">Waiting for location</strong>
             <div id="countdown" class="countdown" aria-live="off">--:--:--</div>
-            <p id="next-event-time" class="supporting-copy">Local contact times will appear here.</p>
+            <p id="next-event-time" class="supporting-copy">Your eclipse times will appear here.</p>
           </section>
 
           <section class="disc-card" aria-labelledby="disc-heading">
             <div class="disc-copy">
-              <p id="disc-heading" class="micro-label">Predicted solar disc</p>
+              <p id="disc-heading" class="micro-label">What the Sun will look like</p>
               <strong id="obscuration-value">—</strong>
-              <span id="phase-label">Set your location</span>
+              <span id="phase-label">Choose your location</span>
             </div>
-            <div id="solar-disc" class="solar-disc" role="img" aria-label="Predicted view of the solar disc">
+            <div id="solar-disc" class="solar-disc" role="img" aria-label="Predicted view of the Sun">
               <span id="moon-disc" class="moon-disc"></span>
             </div>
             <dl class="sky-position">
-              <div><dt>Sun altitude</dt><dd id="sun-altitude">—</dd></div>
-              <div><dt>Azimuth</dt><dd id="sun-azimuth">—</dd></div>
+              <div><dt>Sun above horizon</dt><dd id="sun-altitude">—</dd></div>
+              <div><dt>Direction</dt><dd id="sun-azimuth">—</dd></div>
             </dl>
           </section>
         </div>
@@ -110,11 +110,11 @@
 
         <section class="contact-section" aria-labelledby="contacts-heading">
           <div class="section-heading">
-            <div><p class="micro-label">Your sequence</p><h2 id="contacts-heading">Local contacts</h2></div>
-            <span>UTC</span>
+            <div><p class="micro-label">Your sequence</p><h2 id="contacts-heading">Your eclipse times</h2></div>
+            <span>UTC (world time)</span>
           </div>
           <ol id="contact-list" class="contact-list">
-            <li class="placeholder-contact">Choose a location to calculate C1, maximum, C4 and totality.</li>
+            <li class="placeholder-contact">Choose a location to see when the eclipse begins, reaches its maximum and ends.</li>
           </ol>
         </section>
       </section>
@@ -122,31 +122,32 @@
       <aside class="overview-column">
         <section class="globe-card" aria-labelledby="globe-heading">
           <div class="globe-heading">
-            <div><p class="eyebrow">The moving shadow</p><h2 id="globe-heading">Where the eclipse is now</h2></div>
-            <span class="drag-hint">Drag globe · tap to set location</span>
+            <div><p class="eyebrow">The Moon’s moving shadow</p><h2 id="globe-heading">Where the shadow is</h2></div>
+            <span class="drag-hint">Drag to move · tap to choose a location</span>
           </div>
           <div id="tracker-globe" class="tracker-globe" tabindex="0"></div>
-          <p id="globe-status" class="globe-status" role="status">Calculating the complete path on this device…</p>
+          <p id="globe-status" class="globe-status" role="status">Working out the eclipse path…</p>
         </section>
 
         <section class="field-note" aria-labelledby="field-note-heading">
           <p class="eyebrow">Field notes</p>
           <h2 id="field-note-heading">Built to keep working</h2>
-          <p>The eclipse model, interface, and visited map or terrain tiles are retained after the first load. GPS itself does not need mobile data.</p>
-          <p>An IP-derived network location helps with the first preview, but it is deliberately labelled approximate. Use GPS or manually verified coordinates for final contact timing.</p>
+          <p>Once this page has loaded, it can keep calculating if your connection drops. Maps and height information are saved as you view them. GPS does not need mobile data.</p>
+          <p>Your starting location may be guessed from your internet connection. It is only a rough guess: use GPS or enter a checked location before relying on the times.</p>
           <p id="offline-status">Preparing this page for offline use…</p>
         </section>
 
         <details class="accuracy-note">
-          <summary>Accuracy and timing model</summary>
-          <p>Global shadow geometry uses Shadowline’s WGS 84 ellipsoid. Local contacts and the disc view use Astronomy Engine’s topocentric observer height with an operational ΔT of 69.1734 seconds for 12 August 2026, derived from the <a href="https://maia.usno.navy.mil/ser7/finals2000A.data">IERS finals2000A Earth-orientation prediction</a>.</p>
-          <p>The solar-disc preview is topocentric. When GPS provides no altitude, online map and coordinate selections opportunistically use Mapterhorn’s Copernicus GLO-30 terrain elevation, then retain it with the location. Predictions use a smooth lunar limb, so mountains and valleys on the Moon can still move the observed onset of beads and totality by seconds. Terrain blocking the local horizon is not modelled.</p>
-          <p id="clock-detail">The device clock is used until the CloudFront edge clock can be sampled.</p>
+          <summary>How accurate are these times?</summary>
+          <p>The times are calculated for the latitude, longitude and height shown above. The calculation includes the shape of Earth and its predicted rotation on 12 August 2026.</p>
+          <p>If GPS does not give us your height, we may estimate it from a terrain map while you are online. The calculation treats the edge of the Moon as smooth, but real mountains and valleys on the Moon can change the first and last flashes of sunlight by a few seconds. Nearby hills and buildings that block your view are not included.</p>
+          <p>Use GPS or checked coordinates for the final times, and be ready at least a minute early.</p>
+          <p id="clock-detail">The countdown is using this device’s clock until it can check the time online.</p>
         </details>
       </aside>
     </main>
 
-    <noscript>This tracker needs JavaScript to calculate local eclipse circumstances.</noscript>
+    <noscript>This tracker needs JavaScript to calculate your eclipse times and preview.</noscript>
     <script type="module" src="../../src/tracker-202608.ts"></script>
   </body>
 </html>

@@ -108,7 +108,21 @@ function coordinates(observerValue: Observer): string {
   const longitude = Math.abs(observerValue.longitudeDeg).toFixed(5);
   const northSouth = observerValue.latitudeDeg >= 0 ? "N" : "S";
   const eastWest = observerValue.longitudeDeg >= 0 ? "E" : "W";
-  return `${latitude}° ${northSouth}, ${longitude}° ${eastWest} · ${Math.round(observerValue.elevationMeters ?? 0)} m`;
+  return `${latitude}° ${northSouth}, ${longitude}° ${eastWest} · ${Math.round(observerValue.elevationMeters ?? 0)} m above sea level`;
+}
+
+function compassDirection(degrees: number): string {
+  const directions = [
+    "north",
+    "north-east",
+    "east",
+    "south-east",
+    "south",
+    "south-west",
+    "west",
+    "north-west",
+  ];
+  return directions[Math.round(degrees / 45) % directions.length]!;
 }
 
 function utcTime(value: string | number): string {
@@ -150,7 +164,7 @@ function localContacts(local: LocalEclipse): NamedContact[] {
     ...(local.centralBegin
       ? [{ key: "C2" as const, label: "Totality begins", utc: local.centralBegin.utc, contact: local.centralBegin }]
       : []),
-    { key: "MAX", label: "Local maximum", utc: local.peak.utc, contact: local.peak },
+    { key: "MAX", label: "Most coverage at your location", utc: local.peak.utc, contact: local.peak },
     ...(local.centralEnd
       ? [{ key: "C3" as const, label: "Totality ends", utc: local.centralEnd.utc, contact: local.centralEnd }]
       : []),
@@ -162,9 +176,9 @@ function globalContacts(scene: EclipseScene): NamedContact[] {
   const first = scene.contacts[0];
   const last = scene.contacts.at(-1);
   return [
-    ...(first ? [{ key: "P1" as const, label: "First contact with Earth", utc: first.utc }] : []),
-    { key: "MAX", label: "Global maximum", utc: scene.event.peakUtc },
-    ...(last ? [{ key: "P4" as const, label: "Last contact with Earth", utc: last.utc }] : []),
+    ...(first ? [{ key: "P1" as const, label: "Eclipse begins somewhere on Earth", utc: first.utc }] : []),
+    { key: "MAX", label: "Greatest eclipse", utc: scene.event.peakUtc },
+    ...(last ? [{ key: "P4" as const, label: "Eclipse ends on Earth", utc: last.utc }] : []),
   ];
 }
 
@@ -186,13 +200,13 @@ function formatCountdown(milliseconds: number): string {
 }
 
 function currentPhase(atMs: number): string {
-  if (localCalculationPending) return "Calculating local view";
-  if (!localEclipse) return observer ? "Not visible here" : "Set your location";
+  if (localCalculationPending) return "Calculating your view";
+  if (!localEclipse) return observer ? "Not visible here" : "Choose your location";
   const c1 = Date.parse(localEclipse.partialBegin.utc);
   const c4 = Date.parse(localEclipse.partialEnd.utc);
   const c2 = localEclipse.centralBegin ? Date.parse(localEclipse.centralBegin.utc) : null;
   const c3 = localEclipse.centralEnd ? Date.parse(localEclipse.centralEnd.utc) : null;
-  if (atMs < c1) return "Before first contact";
+  if (atMs < c1) return "Before the eclipse begins";
   if (atMs > c4) return "Eclipse complete";
   if (c2 !== null && c3 !== null && atMs >= c2 && atMs <= c3) return "Totality";
   return "Partial eclipse";
@@ -203,28 +217,28 @@ function renderCountdown(atMs: number): void {
   const next = contacts.find((contact) => Date.parse(contact.utc) > atMs);
   countdownHeading.textContent = observer
     ? "Next at this location"
-    : "Next global milestone";
+    : "Next eclipse event";
   if (!observer && !overviewScene) {
-    nextEventLabel.textContent = "Waiting for eclipse model";
+    nextEventLabel.textContent = "Preparing the eclipse timeline";
     countdown.textContent = "--:--:--";
     return;
   }
   if (localCalculationPending) {
-    nextEventLabel.textContent = "Calculating local contacts";
+    nextEventLabel.textContent = "Calculating your eclipse times";
     countdown.textContent = "--:--:--";
-    nextEventTime.textContent = "Using your precise coordinates and elevation.";
+    nextEventTime.textContent = "Using your location and height above sea level.";
     return;
   }
   if (observer && !localEclipse) {
     nextEventLabel.textContent = "Eclipse not visible here";
     countdown.textContent = "—";
-    nextEventTime.textContent = "Move the globe or change your coordinates to explore another position.";
+    nextEventTime.textContent = "Choose another location on the map or enter a different location.";
     return;
   }
   if (!next) {
     nextEventLabel.textContent = "Eclipse complete";
     countdown.textContent = "00:00:00";
-    nextEventTime.textContent = "All contacts at this location have passed.";
+    nextEventTime.textContent = "The eclipse has finished at this location.";
     return;
   }
   nextEventLabel.textContent = next.label;
@@ -236,10 +250,10 @@ function renderContactList(atMs: number): void {
   const contacts = localEclipse ? localContacts(localEclipse) : [];
   if (contacts.length === 0) {
     const message = localCalculationPending
-      ? "Calculating local contacts…"
+      ? "Calculating your eclipse times…"
       : observer
-        ? "The eclipse is not visible from this position."
-        : "Choose a location to calculate C1, maximum, C4 and totality.";
+        ? "The eclipse is not visible from this location."
+        : "Choose a location to see when the eclipse begins, reaches its maximum and ends.";
     contactList.innerHTML = `<li class="placeholder-contact">${message}</li>`;
     return;
   }
@@ -248,9 +262,9 @@ function renderContactList(atMs: number): void {
       const contactMs = Date.parse(contact.utc);
       const state = atMs >= contactMs ? "is-past" : "";
       const altitude = contact.contact
-        ? `<span>Sun ${contact.contact.sunAltitudeDeg.toFixed(1)}° high · az ${contact.contact.sunAzimuthDeg.toFixed(1)}°</span>`
+        ? `<span>Sun ${contact.contact.sunAltitudeDeg.toFixed(1)}° above the horizon · facing ${compassDirection(contact.contact.sunAzimuthDeg)}</span>`
         : "";
-      return `<li class="${state}"><span class="contact-key">${contact.key}</span><div><strong>${contact.label}</strong>${altitude}</div><time datetime="${contact.utc}">${utcTime(contact.utc)}</time></li>`;
+      return `<li class="${state}"><div><strong>${contact.label}</strong>${altitude}</div><time datetime="${contact.utc}">${utcTime(contact.utc)}</time></li>`;
     })
     .join("");
 }
@@ -258,7 +272,7 @@ function renderContactList(atMs: number): void {
 function renderDisc(atMs: number): void {
   if (!observer) {
     obscurationValue.textContent = "—";
-    phaseLabel.textContent = "Set your location";
+    phaseLabel.textContent = "Choose your location";
     return;
   }
   try {
@@ -271,16 +285,17 @@ function renderDisc(atMs: number): void {
     moonDisc.style.width = `${moonDiameter}px`;
     moonDisc.style.height = `${moonDiameter}px`;
     moonDisc.style.transform = `translate(calc(-50% + ${x.toFixed(2)}px), calc(-50% + ${y.toFixed(2)}px))`;
-    obscurationValue.textContent = `${(geometry.obscuration * 100).toFixed(1)}%`;
+    obscurationValue.textContent = `${(geometry.obscuration * 100).toFixed(1)}% covered`;
     phaseLabel.textContent = currentPhase(atMs);
     sunAltitude.textContent = `${geometry.sunAltitudeDeg.toFixed(1)}°`;
-    sunAzimuth.textContent = `${geometry.sunAzimuthDeg.toFixed(1)}°`;
+    sunAzimuth.textContent = `${compassDirection(geometry.sunAzimuthDeg)} · ${geometry.sunAzimuthDeg.toFixed(1)}°`;
     solarDisc.setAttribute(
       "aria-label",
-      `Predicted solar disc, ${(geometry.obscuration * 100).toFixed(1)} percent obscured. Sun altitude ${geometry.sunAltitudeDeg.toFixed(1)} degrees.`,
+      `The Sun is predicted to be ${(geometry.obscuration * 100).toFixed(1)} percent covered. It is ${geometry.sunAltitudeDeg.toFixed(1)} degrees above the horizon.`,
     );
   } catch (error) {
-    phaseLabel.textContent = error instanceof Error ? error.message : String(error);
+    console.error(error);
+    phaseLabel.textContent = "Preview unavailable";
   }
 }
 
@@ -362,16 +377,16 @@ async function setObserver(
   localCalculationPending = true;
   globe.setLocation(nextObserver);
   locationLabel.textContent = source === "gps"
-    ? "Current GPS position"
+    ? "Location from GPS"
     : source === "geoip"
-      ? "Approximate network location"
+      ? "Rough location"
       : source === "saved"
-        ? "Saved observing position"
+        ? "Saved location"
         : source === "map"
-          ? "Position selected on globe"
-          : "Manual observing position";
+          ? "Location chosen on the map"
+          : "Entered location";
   locationCoordinates.textContent = coordinates(nextObserver);
-  locationMessage.textContent = "Calculating local contacts on this device…";
+  locationMessage.textContent = "Calculating the eclipse times for this location…";
   latitudeInput.value = String(nextObserver.latitudeDeg);
   longitudeInput.value = String(nextObserver.longitudeDeg);
   elevationInput.value = String(nextObserver.elevationMeters ?? 0);
@@ -401,7 +416,7 @@ async function setObserver(
         { ...nextObserver, elevationMeters },
         source,
         false,
-        `Terrain elevation refined to ${Math.round(elevationMeters)} m from GLO-30.`,
+        `Height estimated from the terrain map: ${Math.round(elevationMeters)} m above sea level.`,
       );
     }).catch(() => {
       // Local circumstances already use the supplied height, so terrain
@@ -414,17 +429,18 @@ async function setObserver(
     localEclipse = result.local;
     localCalculationPending = false;
     const approximationDetail = source === "geoip"
-      ? " Approximate network location—use GPS or manual coordinates for final contact timing."
+      ? " This is only a rough location. Use GPS or enter a location before relying on these times."
       : "";
     locationMessage.textContent = result.local
-      ? `${result.local.kind === "total" ? "Totality" : "A partial eclipse"} is visible from this position.${approximationDetail}${elevationDetail ? ` ${elevationDetail}` : ""}`
-      : `The 12 August eclipse is not visible from this position.${approximationDetail}${elevationDetail ? ` ${elevationDetail}` : ""}`;
+      ? `${result.local.kind === "total" ? "You can see totality" : "You can see a partial eclipse"} from this location.${approximationDetail}${elevationDetail ? ` ${elevationDetail}` : ""}`
+      : `The eclipse will not be visible from this location.${approximationDetail}${elevationDetail ? ` ${elevationDetail}` : ""}`;
     updateRange();
     renderFrame();
   } catch (error) {
     if (version !== locationVersion) return;
+    console.error(error);
     localCalculationPending = false;
-    locationMessage.textContent = `Local calculation failed: ${error instanceof Error ? error.message : String(error)}`;
+    locationMessage.textContent = "We could not calculate the eclipse times. Try again or choose another location.";
   }
 }
 
@@ -517,6 +533,13 @@ function calibrationAge(calibration: ClockCalibration): number {
   return Date.now() + calibration.offsetMs - calibration.calibratedAtMs;
 }
 
+function clockAdjustmentMessage(offsetMs: number): string {
+  const differenceSeconds = Math.abs(offsetMs) / 1000;
+  if (differenceSeconds < 0.005) return "No clock adjustment was needed.";
+  const direction = offsetMs > 0 ? "slow" : "fast";
+  return `This device was ${differenceSeconds.toFixed(2)} seconds ${direction}, so the countdown has been corrected.`;
+}
+
 function loadCachedClock(): void {
   try {
     const calibration = JSON.parse(
@@ -535,10 +558,10 @@ function loadCachedClock(): void {
     }
     clockOffsetMs = calibration.offsetMs;
     clockSource = "cached";
-    clockStatus.textContent = "Last edge sync";
+    clockStatus.textContent = "Time checked earlier";
     clockStatus.classList.add("is-ready");
     const ageMinutes = Math.max(1, Math.round(ageMs / 60_000));
-    clockDetail.textContent = `Using an edge-clock calibration from ${ageMinutes} minute${ageMinutes === 1 ? "" : "s"} ago while a fresh sample is unavailable.`;
+    clockDetail.textContent = `The time was checked online ${ageMinutes} minute${ageMinutes === 1 ? "" : "s"} ago. The countdown is still using that correction.`;
   } catch {
     localStorage.removeItem(CLOCK_STORAGE_KEY);
   }
@@ -553,7 +576,7 @@ async function initializeModel(): Promise<void> {
     globe.showGlobalVisibility(result.scene);
     globe.showPeak(result.event.peakLocation?.latitudeDeg, result.event.peakLocation?.longitudeDeg);
     globe.fitPath();
-    globeStatus.textContent = "Purple marks the path of totality. Gold and plum show the penumbra and central shadow at the preview time.";
+    globeStatus.textContent = "Purple marks the path of totality. The shaded areas show where the Moon covers some or all of the Sun at the selected time.";
     updateRange();
     renderFrame();
     const urlObserver = observerFromUrl();
@@ -574,7 +597,8 @@ async function initializeModel(): Promise<void> {
       void resolveApproximateLocation();
     }
   } catch (error) {
-    globeStatus.textContent = `The eclipse model could not start: ${error instanceof Error ? error.message : String(error)}`;
+    console.error(error);
+    globeStatus.textContent = "The eclipse map could not load. Reload the page to try again.";
   }
 }
 
@@ -604,8 +628,8 @@ async function syncClock(): Promise<void> {
     const best = samples.sort((first, second) => first.roundTrip - second.roundTrip)[0];
     if (!best) {
       if (clockSource === "device") {
-        clockStatus.textContent = "Device clock";
-        clockDetail.textContent = "The CloudFront edge clock could not be reached, so countdowns currently use this device’s clock.";
+        clockStatus.textContent = "Using device time";
+        clockDetail.textContent = "We could not check the time online, so the countdown is using this device’s clock.";
       }
       return;
     }
@@ -617,9 +641,9 @@ async function syncClock(): Promise<void> {
       calibratedAtMs: Date.now() + best.offset,
     };
     localStorage.setItem(CLOCK_STORAGE_KEY, JSON.stringify(calibration));
-    clockStatus.textContent = "Edge-synchronised";
+    clockStatus.textContent = "Time checked";
     clockStatus.classList.add("is-ready");
-    clockDetail.textContent = `Countdown calibrated to the CloudFront edge clock (${Math.round(best.roundTrip)} ms round trip; device adjustment ${best.offset >= 0 ? "+" : ""}${Math.round(best.offset)} ms).`;
+    clockDetail.textContent = `Time checked online. ${clockAdjustmentMessage(best.offset)}`;
   } finally {
     clockSyncPending = false;
   }
@@ -631,37 +655,41 @@ function updateNetworkStatus(): void {
   networkStatus.classList.toggle("is-ready", online);
   networkStatus.classList.toggle("is-offline", !online);
   if (!online && clockSource === "edge") {
-    clockStatus.textContent = "Last edge sync";
+    clockStatus.textContent = "Time checked earlier";
   }
 }
 
 async function prepareOffline(): Promise<void> {
   if (!("serviceWorker" in navigator) || !import.meta.env.PROD) {
-    offlineStatus.textContent = "Offline caching is enabled in the production build.";
+    offlineStatus.textContent = "Offline use will be prepared in the published app.";
     return;
   }
   try {
     const serviceWorkerUrl = new URL("./service-worker.js", location.href);
-    await navigator.serviceWorker.register(serviceWorkerUrl, { scope: "./" });
+    const registration = await navigator.serviceWorker.register(serviceWorkerUrl, {
+      scope: "./",
+      updateViaCache: "none",
+    });
+    if (navigator.onLine) await registration.update();
     await navigator.serviceWorker.ready;
-    offlineStatus.textContent = "App shell ready offline. Map and terrain tiles are retained as you view them.";
+    offlineStatus.textContent = "Ready to work offline. Maps and height information are saved as you view them.";
   } catch {
-    offlineStatus.textContent = "Offline preparation did not complete; keep this page open in the field.";
+    offlineStatus.textContent = "Offline setup did not finish. Keep this page open if your connection may drop.";
   }
 }
 
 gpsButton.addEventListener("click", () => {
   if (!("geolocation" in navigator)) {
-    locationMessage.textContent = "This browser does not expose GPS. Enter coordinates manually.";
+    locationMessage.textContent = "GPS is not available in this browser. Enter a location instead.";
     return;
   }
   gpsButton.disabled = true;
   gpsButton.textContent = "Finding GPS…";
-  locationMessage.textContent = "Waiting for a high-accuracy position…";
+  locationMessage.textContent = "Waiting for an accurate GPS location…";
   navigator.geolocation.getCurrentPosition(
     (position) => {
       gpsButton.disabled = false;
-      gpsButton.textContent = "Refresh GPS";
+      gpsButton.textContent = "Update GPS";
       const hasGpsAltitude = position.coords.altitude !== null;
       void setObserver(
         {
@@ -676,7 +704,11 @@ gpsButton.addEventListener("click", () => {
     (error) => {
       gpsButton.disabled = false;
       gpsButton.textContent = "Use my GPS";
-      locationMessage.textContent = `${error.message} Enter coordinates manually if needed.`;
+      locationMessage.textContent = error.code === 1
+        ? "Location access was not allowed. Enter a location instead."
+        : error.code === 2
+          ? "Your location could not be found. Try again or enter it yourself."
+          : "GPS took too long. Try again or enter a location instead.";
     },
     { enableHighAccuracy: true, timeout: 15_000, maximumAge: 15_000 },
   );

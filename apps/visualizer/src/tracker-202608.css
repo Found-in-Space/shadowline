@@ -342,7 +342,7 @@ h2 { margin: 0; font-size: 1.15rem; letter-spacing: -0.025em; }
 .contact-list { display: grid; gap: 0; margin: 12px 0 0; padding: 0; list-style: none; }
 .contact-list li {
   display: grid;
-  grid-template-columns: 38px minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: 9px;
   align-items: center;
   min-height: 53px;
@@ -350,7 +350,6 @@ h2 { margin: 0; font-size: 1.15rem; letter-spacing: -0.025em; }
 }
 
 .contact-list li.is-past { opacity: 0.5; }
-.contact-key { display: grid; place-items: center; width: 33px; height: 26px; border-radius: 7px; color: #1d1025; background: var(--violet); font-size: 0.63rem; font-weight: 900; }
 .contact-list li:first-child { border-top: 0; }
 .contact-list strong,
 .contact-list div span { display: block; }

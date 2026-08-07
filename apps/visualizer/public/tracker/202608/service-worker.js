@@ -1,4 +1,4 @@
-const CACHE_NAME = "shadowline-tracker-202608-v4";
+const CACHE_NAME = "shadowline-tracker-202608-v5";
 const APP_ROOT = new URL("./", self.location.href);
 
 async function appShellUrls() {

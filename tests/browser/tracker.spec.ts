@@ -22,7 +22,8 @@ test("provides a mobile local eclipse field view and manual preview", async ({
   await expect(
     page.getByRole("heading", { name: "12 August 2026" }),
   ).toBeVisible();
-  await expect(page.getByText("Totality is visible from this position.")).toBeVisible();
+  await expect(page.getByText("You can see totality from this location.")).toBeVisible();
+  await expect(page.locator('a[href*="shadow-cones"]')).toHaveCount(0);
   await expect(page.locator("#contact-list li")).toHaveCount(5);
   await expect(page.locator("#tracker-globe")).toHaveAttribute(
     "data-renderer-ready",
@@ -40,15 +41,15 @@ test("provides a mobile local eclipse field view and manual preview", async ({
   await expect(page.locator("#obscuration-value")).not.toHaveText("—");
 
   await expect(page.locator("#offline-status")).toContainText(
-    "App shell ready offline",
+    "Ready to work offline",
   );
   await context.setOffline(true);
   await page.reload({ waitUntil: "domcontentloaded" });
   await expect(
     page.getByRole("heading", { name: "12 August 2026" }),
   ).toBeVisible();
-  await expect(page.getByText("Totality is visible from this position.")).toBeVisible();
-  await expect(page.locator("#clock-status")).toHaveText("Last edge sync");
+  await expect(page.getByText("You can see totality from this location.")).toBeVisible();
+  await expect(page.locator("#clock-status")).toHaveText("Time checked earlier");
 });
 
 test("refines a missing observer elevation without blocking contacts", async ({
@@ -76,7 +77,7 @@ test("refines a missing observer elevation without blocking contacts", async ({
   await page.goto("/tracker/202608/?lat=65.1411&lon=-25.3272");
 
   await expect(page.locator("#location-message")).toContainText(
-    "Terrain elevation refined to 2 m from GLO-30.",
+    "Height estimated from the terrain map: 2 m above sea level.",
   );
   await expect(page.locator("#contact-list li")).toHaveCount(5);
   await context.close();
@@ -87,12 +88,12 @@ test("does not invent a zero-zero observer when coordinates are absent", async (
 }) => {
   await page.goto("/tracker/202608/");
   await expect(page.locator("#location-label")).toHaveText(
-    "Choose a location for local predictions",
+    "Choose a location to see your eclipse times",
   );
   expect(new URL(page.url()).searchParams.has("lat")).toBe(false);
 });
 
-test("uses CloudFront GeoIP only as a clearly labelled location fallback", async ({
+test("uses a clearly labelled rough location only as a fallback", async ({
   page,
 }) => {
   await page.unroute("https://data.foundin.space/api/v1/location");
@@ -120,10 +121,10 @@ test("uses CloudFront GeoIP only as a clearly labelled location fallback", async
   await page.goto("/tracker/202608/");
 
   await expect(page.locator("#location-label")).toHaveText(
-    "Approximate network location",
+    "Rough location",
   );
   await expect(page.locator("#location-message")).toContainText(
-    "use GPS or manual coordinates for final contact timing",
+    "Use GPS or enter a location before relying on these times",
   );
   await expect(page.locator("#contact-list li")).toHaveCount(5);
   const currentUrl = new URL(page.url());

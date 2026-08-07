@@ -1,7 +1,7 @@
 {
   "name": "Shadowline — 12 August 2026 Eclipse Tracker",
   "short_name": "Eclipse 2026",
-  "description": "Offline-ready local circumstances for the 12 August 2026 total solar eclipse.",
+  "description": "Eclipse times and a live preview for your location, built to keep working with a poor connection.",
   "id": "./",
   "lang": "en",
   "start_url": "./",
