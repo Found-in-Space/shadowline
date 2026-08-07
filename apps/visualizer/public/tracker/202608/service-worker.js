@@ -1,4 +1,4 @@
-const CACHE_NAME = "shadowline-tracker-202608-v3";
+const CACHE_NAME = "shadowline-tracker-202608-v4";
 const APP_ROOT = new URL("./", self.location.href);
 
 async function appShellUrls() {
@@ -45,7 +45,10 @@ self.addEventListener("fetch", (event) => {
   const request = event.request;
   if (request.method !== "GET") return;
   const url = new URL(request.url);
-  if (url.hostname === "data.foundin.space" && url.pathname === "/api/v1/time") return;
+  if (
+    url.hostname === "data.foundin.space" &&
+    (url.pathname === "/api/v1/time" || url.pathname === "/api/v1/location")
+  ) return;
 
   if (request.mode === "navigate") {
     event.respondWith(

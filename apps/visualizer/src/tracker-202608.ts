@@ -16,6 +16,7 @@ import { terrainElevationMeters } from "./tracker-terrain.js";
 import { TrackerWorkerClient } from "./tracker-worker-client.js";
 
 const CLOCK_URL = "https://data.foundin.space/api/v1/time";
+const LOCATION_URL = "https://data.foundin.space/api/v1/location";
 const LOCATION_STORAGE_KEY = "shadowline-tracker-202608-location";
 const CLOCK_STORAGE_KEY = "shadowline-tracker-202608-clock";
 const CLOCK_CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
@@ -29,6 +30,15 @@ interface NamedContact {
   label: string;
   utc: string;
   contact?: EclipseContact;
+}
+
+type LocationSource = "gps" | "geoip" | "manual" | "map" | "saved";
+
+interface ApproximateLocationResponse {
+  available?: unknown;
+  precision?: unknown;
+  latitude?: unknown;
+  longitude?: unknown;
 }
 
 const element = <T extends HTMLElement>(id: string): T => {
@@ -352,7 +362,7 @@ function updateRange(): void {
 
 async function setObserver(
   nextObserver: Observer,
-  source: "gps" | "manual" | "map" | "saved",
+  source: LocationSource,
   refineTerrain = false,
   elevationDetail = "",
 ): Promise<void> {
@@ -361,18 +371,30 @@ async function setObserver(
   localEclipse = null;
   localCalculationPending = true;
   globe.setLocation(nextObserver);
-  locationLabel.textContent = source === "gps" ? "Current GPS position" : source === "saved" ? "Saved observing position" : source === "map" ? "Position selected on globe" : "Manual observing position";
+  locationLabel.textContent = source === "gps"
+    ? "Current GPS position"
+    : source === "geoip"
+      ? "Approximate network location"
+      : source === "saved"
+        ? "Saved observing position"
+        : source === "map"
+          ? "Position selected on globe"
+          : "Manual observing position";
   locationCoordinates.textContent = coordinates(nextObserver);
   locationMessage.textContent = "Calculating local contacts on this device…";
   latitudeInput.value = String(nextObserver.latitudeDeg);
   longitudeInput.value = String(nextObserver.longitudeDeg);
   elevationInput.value = String(nextObserver.elevationMeters ?? 0);
-  localStorage.setItem(LOCATION_STORAGE_KEY, JSON.stringify(nextObserver));
+  if (source !== "geoip") {
+    localStorage.setItem(LOCATION_STORAGE_KEY, JSON.stringify(nextObserver));
+  }
   const url = new URL(location.href);
   url.searchParams.set("lat", nextObserver.latitudeDeg.toFixed(6));
   url.searchParams.set("lon", nextObserver.longitudeDeg.toFixed(6));
   if (nextObserver.elevationMeters) url.searchParams.set("elevation", String(Math.round(nextObserver.elevationMeters)));
   else url.searchParams.delete("elevation");
+  if (source === "geoip") url.searchParams.set("location", "geoip");
+  else url.searchParams.delete("location");
   history.replaceState(null, "", url);
   lastDiscBucket = Number.NaN;
   if (refineTerrain && navigator.onLine) {
@@ -401,15 +423,61 @@ async function setObserver(
     if (version !== locationVersion) return;
     localEclipse = result.local;
     localCalculationPending = false;
+    const approximationDetail = source === "geoip"
+      ? " Approximate network location—use GPS or manual coordinates for final contact timing."
+      : "";
     locationMessage.textContent = result.local
-      ? `${result.local.kind === "total" ? "Totality" : "A partial eclipse"} is visible from this position.${elevationDetail ? ` ${elevationDetail}` : ""}`
-      : `The 12 August eclipse is not visible from this position.${elevationDetail ? ` ${elevationDetail}` : ""}`;
+      ? `${result.local.kind === "total" ? "Totality" : "A partial eclipse"} is visible from this position.${approximationDetail}${elevationDetail ? ` ${elevationDetail}` : ""}`
+      : `The 12 August eclipse is not visible from this position.${approximationDetail}${elevationDetail ? ` ${elevationDetail}` : ""}`;
     updateRange();
     renderFrame();
   } catch (error) {
     if (version !== locationVersion) return;
     localCalculationPending = false;
     locationMessage.textContent = `Local calculation failed: ${error instanceof Error ? error.message : String(error)}`;
+  }
+}
+
+async function resolveApproximateLocation(): Promise<void> {
+  if (!event || !navigator.onLine || observer || locationVersion !== 0) return;
+  const version = locationVersion;
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), 4_000);
+  try {
+    const response = await fetch(LOCATION_URL, {
+      cache: "no-store",
+      signal: controller.signal,
+    });
+    if (!response.ok) return;
+    const payload = (await response.json()) as ApproximateLocationResponse;
+    if (
+      payload.available !== true ||
+      payload.precision !== "ip" ||
+      typeof payload.latitude !== "number" ||
+      !Number.isFinite(payload.latitude) ||
+      payload.latitude < -90 ||
+      payload.latitude > 90 ||
+      typeof payload.longitude !== "number" ||
+      !Number.isFinite(payload.longitude) ||
+      payload.longitude < -180 ||
+      payload.longitude > 180 ||
+      observer ||
+      version !== locationVersion
+    ) return;
+    await setObserver(
+      {
+        latitudeDeg: payload.latitude,
+        longitudeDeg: payload.longitude,
+        elevationMeters: 0,
+      },
+      "geoip",
+      true,
+    );
+  } catch {
+    // Network location is only a convenience fallback. GPS, manual entry,
+    // saved coordinates and globe selection remain fully available.
+  } finally {
+    window.clearTimeout(timeout);
   }
 }
 
@@ -502,11 +570,18 @@ async function initializeModel(): Promise<void> {
     const initialObserver = urlObserver ?? savedObserver();
     if (initialObserver) {
       const hasUrlElevation = new URL(location.href).searchParams.has("elevation");
+      const source: LocationSource = urlObserver
+        ? new URL(location.href).searchParams.get("location") === "geoip"
+          ? "geoip"
+          : "manual"
+        : "saved";
       void setObserver(
         initialObserver,
-        urlObserver ? "manual" : "saved",
+        source,
         Boolean(urlObserver && !hasUrlElevation),
       );
+    } else {
+      void resolveApproximateLocation();
     }
   } catch (error) {
     globeStatus.textContent = `The eclipse model could not start: ${error instanceof Error ? error.message : String(error)}`;
@@ -668,6 +743,7 @@ liveButton.addEventListener("click", () => {
 window.addEventListener("online", () => {
   updateNetworkStatus();
   void syncClock();
+  void resolveApproximateLocation();
 });
 window.addEventListener("offline", updateNetworkStatus);
 document.addEventListener("visibilitychange", () => {

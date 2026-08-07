@@ -2,6 +2,8 @@ import { expect, test } from "@playwright/test";
 
 test.beforeEach(async ({ page }) => {
   await page.route("https://tile.openstreetmap.org/**", (route) => route.abort());
+  await page.route("https://tiles.mapterhorn.com/**", (route) => route.abort());
+  await page.route("https://data.foundin.space/api/v1/location", (route) => route.abort());
   await page.route("https://data.foundin.space/api/v1/time", (route) =>
     route.fulfill({
       contentType: "application/json",
@@ -105,4 +107,48 @@ test("does not invent a zero-zero observer when coordinates are absent", async (
     "Choose a location for local predictions",
   );
   expect(new URL(page.url()).searchParams.has("lat")).toBe(false);
+});
+
+test("uses CloudFront GeoIP only as a clearly labelled location fallback", async ({
+  page,
+}) => {
+  await page.unroute("https://data.foundin.space/api/v1/location");
+  await page.route("https://data.foundin.space/api/v1/location", (route) =>
+    route.fulfill({
+      contentType: "application/json",
+      headers: {
+        "access-control-allow-origin": "*",
+        "cache-control": "no-store",
+      },
+      body: JSON.stringify({
+        available: true,
+        precision: "ip",
+        latitude: 65.1411,
+        longitude: -25.3272,
+        city: "Reykjavik",
+        region: "Capital Region",
+        countryName: "Iceland",
+        countryCode: "IS",
+        postalCode: null,
+        timezone: "Atlantic/Reykjavik",
+      }),
+    }),
+  );
+  await page.goto("/tracker/202608/");
+
+  await expect(page.locator("#location-label")).toHaveText(
+    "Approximate network location",
+  );
+  await expect(page.locator("#location-message")).toContainText(
+    "use GPS or manual coordinates for final contact timing",
+  );
+  await expect(page.locator("#contact-list li")).toHaveCount(5);
+  const currentUrl = new URL(page.url());
+  expect(currentUrl.searchParams.get("location")).toBe("geoip");
+  expect(currentUrl.searchParams.get("lat")).toBe("65.141100");
+  expect(
+    await page.evaluate(() =>
+      localStorage.getItem("shadowline-tracker-202608-location"),
+    ),
+  ).toBeNull();
 });
