@@ -7,6 +7,7 @@ import type {
   LocalEclipse,
   Observer,
 } from "@found-in-space/shadowline";
+import { ecefToGeodetic } from "@found-in-space/shadowline";
 import { MapLibreGlobeRenderer } from "./maplibre-renderer.js";
 import type { LeafletMercatorRenderer } from "./leaflet-renderer.js";
 import type { TrackerShadowView } from "./tracker-shadow-view.js";
@@ -81,6 +82,7 @@ const liveButton = element<HTMLButtonElement>("live-button");
 const contactList = element<HTMLOListElement>("contact-list");
 const globeStatus = element("globe-status");
 const overviewHint = element("overview-hint");
+const overviewFollow = element<HTMLButtonElement>("overview-follow");
 const overviewTabs: Record<OverviewView, HTMLButtonElement> = {
   globe: element<HTMLButtonElement>("globe-tab"),
   map: element<HTMLButtonElement>("map-tab"),
@@ -115,6 +117,7 @@ let lastDiscBucket = Number.NaN;
 let activeOverviewView: OverviewView = "globe";
 let mercator: LeafletMercatorRenderer | null = null;
 let shadowView: TrackerShadowView | null = null;
+let mapFollowingShadow = true;
 let instantaneousScene: EclipseScene | null = null;
 let globeOverviewStatus = "Working out the eclipse path…";
 let shadowOverviewStatus = "Preparing the physical shadow view…";
@@ -136,18 +139,88 @@ function currentTrackerTime(): number {
   return followLive ? monotonicEpochNow() : previewTimeMs;
 }
 
+function shadowCentre(scene: EclipseScene): {
+  latitudeDeg: number;
+  longitudeDeg: number;
+} | null {
+  const shadow = scene.instantaneousShadows[0];
+  const region = shadow?.central?.region ?? shadow?.penumbra;
+  const ring = region?.rings.length
+    ? region.rings.reduce((largest, candidate) =>
+        candidate.points.length > largest.points.length ? candidate : largest
+      )
+    : undefined;
+  if (!ring || ring.points.length === 0) return null;
+
+  const sum = ring.points.reduce(
+    (total, point) => ({
+      x: total.x + point.ecefKm.x,
+      y: total.y + point.ecefKm.y,
+      z: total.z + point.ecefKm.z,
+    }),
+    { x: 0, y: 0, z: 0 },
+  );
+  const average = {
+    x: sum.x / ring.points.length,
+    y: sum.y / ring.points.length,
+    z: sum.z / ring.points.length,
+  };
+  if (Math.hypot(average.x, average.y, average.z) < 100) return null;
+  return ecefToGeodetic(average);
+}
+
+function followMercatorShadow(scene = instantaneousScene): void {
+  if (!mercator || !mapFollowingShadow || !scene) return;
+  const centre = shadowCentre(scene);
+  if (!centre) return;
+  mercator.map.panTo(
+    [centre.latitudeDeg, centre.longitudeDeg],
+    { animate: false },
+  );
+  overviewPanes.map.dataset.followLatitude = centre.latitudeDeg.toFixed(5);
+  overviewPanes.map.dataset.followLongitude = centre.longitudeDeg.toFixed(5);
+}
+
+function updateFollowControl(): void {
+  overviewFollow.hidden = activeOverviewView === "globe";
+  if (activeOverviewView === "globe") return;
+  const following = activeOverviewView === "map"
+    ? mapFollowingShadow
+    : shadowView?.isFollowingShadow() ?? true;
+  overviewFollow.setAttribute("aria-pressed", String(following));
+  overviewFollow.textContent = following ? "Following shadow" : "Follow shadow";
+}
+
+function setMapFollowingShadow(following: boolean): void {
+  if (mapFollowingShadow === following) return;
+  mapFollowingShadow = following;
+  overviewPanes.map.dataset.followingShadow = String(following);
+  if (following) followMercatorShadow();
+  updateFollowControl();
+  if (activeOverviewView === "map") showOverviewStatus();
+}
+
 function showOverviewStatus(): void {
   if (activeOverviewView === "globe") {
     globeStatus.textContent = globeOverviewStatus;
     overviewHint.textContent = "Drag to explore · tap to choose a location";
   } else if (activeOverviewView === "map") {
-    globeStatus.textContent = mercator
-      ? "Use the map for a closer look. Tap anywhere to calculate the eclipse there."
-      : "Preparing the map…";
-    overviewHint.textContent = "Drag to move · pinch to zoom · tap to choose";
+    globeStatus.textContent = !mercator
+      ? "Preparing the map…"
+      : mapFollowingShadow
+        ? "The map is following the shadow. Tap anywhere to calculate the eclipse there."
+        : "The map will stay where you left it. Choose Follow shadow to catch up.";
+    overviewHint.textContent = mapFollowingShadow
+      ? "Drag or zoom to hold another view · tap to choose"
+      : "Drag to move · pinch to zoom · tap to choose";
   } else {
-    globeStatus.textContent = shadowOverviewStatus;
-    overviewHint.textContent = "Drag to turn · pinch to zoom";
+    const following = shadowView?.isFollowingShadow() ?? true;
+    globeStatus.textContent = following
+      ? shadowOverviewStatus
+      : `The view will stay where you left it. ${shadowOverviewStatus}`;
+    overviewHint.textContent = following
+      ? "Drag or zoom to hold another view"
+      : "Drag to turn · pinch to zoom";
   }
 }
 
@@ -175,6 +248,10 @@ async function ensureMercator(): Promise<LeafletMercatorRenderer> {
   }
   if (instantaneousScene) mercator.showShadowOutline(instantaneousScene);
   if (observer) mercator.setLocation(observer);
+  overviewPanes.map.dataset.followingShadow = String(mapFollowingShadow);
+  mercator.map.on("dragstart", () => setMapFollowingShadow(false));
+  mercator.map.on("zoomstart", () => setMapFollowingShadow(false));
+  followMercatorShadow();
   return mercator;
 }
 
@@ -184,6 +261,10 @@ async function ensureShadowView(): Promise<TrackerShadowView> {
   shadowView = new module.TrackerShadowView(overviewPanes.shadow, {
     onStatus: (message) => {
       shadowOverviewStatus = message;
+      if (activeOverviewView === "shadow") showOverviewStatus();
+    },
+    onFollowingChange: () => {
+      updateFollowControl();
       if (activeOverviewView === "shadow") showOverviewStatus();
     },
   });
@@ -200,6 +281,7 @@ async function selectOverviewView(view: OverviewView, focus = false): Promise<vo
     overviewPanes[name].hidden = !selected;
   }
   shadowView?.setActive(view === "shadow");
+  updateFollowControl();
   showOverviewStatus();
   try {
     if (view === "map") await ensureMercator();
@@ -208,6 +290,7 @@ async function selectOverviewView(view: OverviewView, focus = false): Promise<vo
       renderer.setActive(true);
       renderer.setTime(currentTrackerTime());
     }
+    updateFollowControl();
     showOverviewStatus();
   } catch (error) {
     console.error(error);
@@ -482,6 +565,7 @@ async function updateShadow(atMs: number): Promise<void> {
     instantaneousScene = result.scene;
     globe.showShadowOutline(result.scene);
     mercator?.showShadowOutline(result.scene);
+    followMercatorShadow(result.scene);
   } catch {
     if (version === shadowVersion) {
       instantaneousScene = null;
@@ -942,6 +1026,14 @@ for (const [view, tab] of Object.entries(overviewTabs) as [OverviewView, HTMLBut
     void selectOverviewView(targetView);
   });
 }
+
+overviewFollow.addEventListener("click", () => {
+  if (activeOverviewView === "map") {
+    setMapFollowingShadow(true);
+  } else if (activeOverviewView === "shadow") {
+    shadowView?.resumeFollowing();
+  }
+});
 
 timeSlider.addEventListener("input", () => {
   setPreview(rangeStartMs + Number(timeSlider.value) * 1000);

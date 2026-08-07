@@ -21,6 +21,7 @@ type WorkerResponse =
 
 interface TrackerShadowViewOptions {
   onStatus?: (message: string) => void;
+  onFollowingChange?: (following: boolean) => void;
 }
 
 const siteRoot = new URL(/* @vite-ignore */ "../", import.meta.url);
@@ -192,6 +193,8 @@ export class TrackerShadowView {
   private shadowAxis = new THREE.Vector3(1, 0, 0);
   private cameraPreset: "earth" | "system" = "earth";
   private frameStatus = "Preparing the physical shadow view…";
+  private followingShadow = true;
+  private controlGestureActive = false;
 
   constructor(
     private readonly container: HTMLElement,
@@ -274,6 +277,15 @@ export class TrackerShadowView {
     this.controls.update();
     earthButton.addEventListener("click", () => this.applyCameraPreset("earth"));
     systemButton.addEventListener("click", () => this.applyCameraPreset("system"));
+    this.controls.addEventListener("start", () => {
+      this.controlGestureActive = true;
+    });
+    this.controls.addEventListener("change", () => {
+      if (this.controlGestureActive) this.setFollowingShadow(false);
+    });
+    this.controls.addEventListener("end", () => {
+      this.controlGestureActive = false;
+    });
 
     this.resizeObserver = new ResizeObserver(() => this.resize());
     this.resizeObserver.observe(container);
@@ -284,6 +296,7 @@ export class TrackerShadowView {
       this.options.onStatus?.("The physical shadow view could not start.");
     });
     container.dataset.rendererReady = "true";
+    container.dataset.followingShadow = "true";
     this.resize();
   }
 
@@ -305,6 +318,15 @@ export class TrackerShadowView {
     this.lastRequestedSecond = second;
     this.queuedTimeMs = timeMs;
     if (this.active) this.requestFrame();
+  }
+
+  isFollowingShadow(): boolean {
+    return this.followingShadow;
+  }
+
+  resumeFollowing(): void {
+    this.setFollowingShadow(true);
+    if (!this.firstFrame) this.applyCameraPreset(this.cameraPreset, false);
   }
 
   private requestFrame(): void {
@@ -376,13 +398,26 @@ export class TrackerShadowView {
         : "The Moon’s shadow cones are not reaching Earth at this time.";
     if (this.firstFrame) {
       this.firstFrame = false;
-      this.applyCameraPreset("earth");
+      this.applyCameraPreset("earth", false);
+    } else if (this.followingShadow && !this.controlGestureActive) {
+      this.applyCameraPreset(this.cameraPreset, false);
     } else {
       this.showCameraStatus();
     }
   }
 
-  private applyCameraPreset(preset: "earth" | "system"): void {
+  private setFollowingShadow(following: boolean): void {
+    if (this.followingShadow === following) return;
+    this.followingShadow = following;
+    this.container.dataset.followingShadow = String(following);
+    this.options.onFollowingChange?.(following);
+  }
+
+  private applyCameraPreset(
+    preset: "earth" | "system",
+    resumeFollowing = true,
+  ): void {
+    if (resumeFollowing) this.setFollowingShadow(true);
     this.cameraPreset = preset;
     for (const [name, button] of Object.entries(this.cameraPresetButtons)) {
       button.setAttribute("aria-pressed", String(name === preset));

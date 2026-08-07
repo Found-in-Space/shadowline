@@ -51,6 +51,13 @@ test("provides a mobile local eclipse field view and manual preview", async ({
     .poll(async () => Number((await page.locator("#tracker-globe").getAttribute("data-path-feature-count")) ?? 0))
     .toBeGreaterThan(0);
 
+  await page.locator("#time-slider").evaluate((slider: HTMLInputElement) => {
+    slider.value = String(Math.round(Number(slider.max) / 2));
+    slider.dispatchEvent(new Event("input", { bubbles: true }));
+  });
+  await expect(page.locator("#mode-badge")).toHaveText("PREVIEW");
+  await expect(page.locator("#obscuration-value")).not.toHaveText("—");
+
   await page.getByRole("tab", { name: "Map" }).click();
   await expect(page.locator("#tracker-map")).toHaveAttribute(
     "data-renderer-ready",
@@ -59,11 +66,53 @@ test("provides a mobile local eclipse field view and manual preview", async ({
   await expect
     .poll(async () => Number((await page.locator("#tracker-map").getAttribute("data-path-feature-count")) ?? 0))
     .toBeGreaterThan(0);
+  await expect(page.locator("#tracker-map")).toHaveAttribute(
+    "data-following-shadow",
+    "true",
+  );
+  await expect(page.getByRole("button", { name: "Following shadow" })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  const mapBounds = await page.locator("#tracker-map").boundingBox();
+  if (!mapBounds) throw new Error("The eclipse map has no visible bounds.");
+  await page.mouse.move(mapBounds.x + mapBounds.width / 2, mapBounds.y + mapBounds.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(mapBounds.x + mapBounds.width / 2 + 45, mapBounds.y + mapBounds.height / 2 + 20);
+  await page.mouse.up();
+  await expect(page.locator("#tracker-map")).toHaveAttribute(
+    "data-following-shadow",
+    "false",
+  );
+  await page.getByRole("button", { name: "Follow shadow", exact: true }).click();
+  await expect(page.locator("#tracker-map")).toHaveAttribute(
+    "data-following-shadow",
+    "true",
+  );
 
   await page.getByRole("tab", { name: "Shadow" }).click();
   await expect(page.locator("#tracker-shadow canvas")).toHaveCount(1);
   await expect(page.locator("#tracker-shadow")).toHaveAttribute(
     "data-renderer-ready",
+    "true",
+  );
+  await expect(page.locator("#tracker-shadow")).toHaveAttribute(
+    "data-following-shadow",
+    "true",
+  );
+  const shadowBounds = await page.locator("#tracker-shadow canvas").boundingBox();
+  if (!shadowBounds) throw new Error("The physical shadow view has no visible bounds.");
+  await page.mouse.move(shadowBounds.x + shadowBounds.width / 2, shadowBounds.y + shadowBounds.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(shadowBounds.x + shadowBounds.width / 2 + 45, shadowBounds.y + shadowBounds.height / 2 + 20);
+  await page.mouse.up();
+  await expect(page.locator("#tracker-shadow")).toHaveAttribute(
+    "data-following-shadow",
+    "false",
+  );
+  await page.getByRole("button", { name: "Follow shadow", exact: true }).click();
+  await expect(page.locator("#tracker-shadow")).toHaveAttribute(
+    "data-following-shadow",
     "true",
   );
   await page.getByRole("button", { name: "Earth + Moon" }).click();
@@ -74,13 +123,6 @@ test("provides a mobile local eclipse field view and manual preview", async ({
 
   await page.getByRole("tab", { name: "Globe" }).click();
   await expect(page.locator("#tracker-globe")).toBeVisible();
-
-  await page.locator("#time-slider").evaluate((slider: HTMLInputElement) => {
-    slider.value = String(Math.round(Number(slider.max) / 2));
-    slider.dispatchEvent(new Event("input", { bubbles: true }));
-  });
-  await expect(page.locator("#mode-badge")).toHaveText("PREVIEW");
-  await expect(page.locator("#obscuration-value")).not.toHaveText("—");
 
   await expect(page.locator("#offline-status")).toContainText(
     /ready for a poor connection/i,

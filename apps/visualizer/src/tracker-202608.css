@@ -375,6 +375,24 @@ h2 { margin: 0; font-size: 1.15rem; letter-spacing: -0.025em; }
 }
 .overview-tabs button[aria-selected="true"] { color: #25122d; border-color: transparent; background: var(--violet); }
 .overview-stage { position: relative; background: #111624; }
+.overview-follow {
+  position: absolute;
+  z-index: 1001;
+  top: 10px;
+  right: 10px;
+  min-height: 32px;
+  padding: 5px 9px;
+  border: 1px solid rgb(99 214 200 / 34%);
+  border-radius: 99px;
+  color: #bdf7ed;
+  background: rgb(9 13 23 / 82%);
+  cursor: pointer;
+  font-size: 0.6rem;
+  font-weight: 850;
+  backdrop-filter: blur(10px);
+}
+.overview-follow[hidden] { display: none; }
+.overview-follow[aria-pressed="false"] { color: var(--gold); border-color: rgb(255 202 104 / 42%); }
 .tracker-overview-pane { position: relative; width: 100%; height: min(64vh, 480px); min-height: 330px; background: #111624; }
 .tracker-overview-pane[hidden] { display: none; }
 .tracker-shadow canvas { display: block; width: 100%; height: 100%; touch-action: none; }
