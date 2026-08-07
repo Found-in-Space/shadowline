@@ -9,6 +9,7 @@ import {
   circleOverlapFraction,
   configureOperationalDeltaT202608,
   solarDiscGeometry,
+  solarHorizonGeometry,
 } from "../apps/visualizer/src/tracker-astronomy.js";
 
 const astronomyNamespace = Astronomy as unknown as Record<string, unknown>;
@@ -31,6 +32,29 @@ describe("tracker solar-disc geometry", () => {
       0.3910022189557707,
       12,
     );
+  });
+
+  it("moves the horizon edge progressively across the solar disc", () => {
+    expect(solarHorizonGeometry(0.5, 0.25)).toEqual({
+      state: "above",
+      edgePositionPercent: 100,
+    });
+    expect(solarHorizonGeometry(0.125, 0.25)).toEqual({
+      state: "crossing",
+      edgePositionPercent: 75,
+    });
+    expect(solarHorizonGeometry(0, 0.25)).toEqual({
+      state: "crossing",
+      edgePositionPercent: 50,
+    });
+    expect(solarHorizonGeometry(-0.125, 0.25)).toEqual({
+      state: "crossing",
+      edgePositionPercent: 25,
+    });
+    expect(solarHorizonGeometry(-0.5, 0.25)).toEqual({
+      state: "below",
+      edgePositionPercent: 0,
+    });
   });
 
   it("shows totality near the 2026 centre line", () => {

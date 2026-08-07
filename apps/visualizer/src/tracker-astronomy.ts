@@ -32,10 +32,17 @@ export interface SolarDiscGeometry {
   moonRadiusDeg: number;
   eastOffsetDeg: number;
   northOffsetDeg: number;
+  horizontalOffsetDeg: number;
+  verticalOffsetDeg: number;
   separationDeg: number;
   obscuration: number;
   sunAltitudeDeg: number;
   sunAzimuthDeg: number;
+}
+
+export interface SolarHorizonGeometry {
+  state: "above" | "crossing" | "below";
+  edgePositionPercent: number;
 }
 
 interface Vector3 {
@@ -62,6 +69,17 @@ function cross(first: Vector3, second: Vector3): Vector3 {
     x: first.y * second.z - first.z * second.y,
     y: first.z * second.x - first.x * second.z,
     z: first.x * second.y - first.y * second.x,
+  };
+}
+
+function horizontalDirection(altitudeDeg: number, azimuthDeg: number): Vector3 {
+  const degreesToRadians = Math.PI / 180;
+  const altitude = altitudeDeg * degreesToRadians;
+  const azimuth = azimuthDeg * degreesToRadians;
+  return {
+    x: Math.cos(altitude) * Math.sin(azimuth),
+    y: Math.cos(altitude) * Math.cos(azimuth),
+    z: Math.sin(altitude),
   };
 }
 
@@ -110,6 +128,25 @@ export function circleOverlapFraction(
   return Math.min(1, Math.max(0, area / (Math.PI * backgroundRadius ** 2)));
 }
 
+export function solarHorizonGeometry(
+  sunAltitudeDeg: number,
+  sunRadiusDeg: number,
+): SolarHorizonGeometry {
+  if (!Number.isFinite(sunAltitudeDeg) || !Number.isFinite(sunRadiusDeg) || sunRadiusDeg <= 0) {
+    throw new RangeError("Solar altitude must be finite and radius positive.");
+  }
+  const edgePositionPercent = Math.min(
+    100,
+    Math.max(0, 50 + (50 * sunAltitudeDeg) / sunRadiusDeg),
+  );
+  const state = sunAltitudeDeg >= sunRadiusDeg
+    ? "above"
+    : sunAltitudeDeg <= -sunRadiusDeg
+      ? "below"
+      : "crossing";
+  return { state, edgePositionPercent };
+}
+
 export function solarDiscGeometry(
   observer: Observer,
   at: Date,
@@ -143,12 +180,49 @@ export function solarDiscGeometry(
     sun.dec,
     "normal",
   );
+  const moonHorizontal = Horizon(
+    at,
+    location,
+    moon.ra,
+    moon.dec,
+    "normal",
+  );
+  const localSunDirection = horizontalDirection(
+    horizontal.altitude,
+    horizontal.azimuth,
+  );
+  const localMoonDirection = horizontalDirection(
+    moonHorizontal.altitude,
+    moonHorizontal.azimuth,
+  );
+  const azimuthRadians = horizontal.azimuth * Math.PI / 180;
+  const altitudeRadians = horizontal.altitude * Math.PI / 180;
+  const localHorizontal = {
+    x: Math.cos(azimuthRadians),
+    y: -Math.sin(azimuthRadians),
+    z: 0,
+  };
+  const localVertical = {
+    x: -Math.sin(altitudeRadians) * Math.sin(azimuthRadians),
+    y: -Math.sin(altitudeRadians) * Math.cos(azimuthRadians),
+    z: Math.cos(altitudeRadians),
+  };
+  const localRadial = Math.max(
+    -1,
+    Math.min(1, dot(localMoonDirection, localSunDirection)),
+  );
   const radiansToDegrees = 180 / Math.PI;
   return {
     sunRadiusDeg: sunRadius * radiansToDegrees,
     moonRadiusDeg: moonRadius * radiansToDegrees,
     eastOffsetDeg: eastOffset * radiansToDegrees,
     northOffsetDeg: northOffset * radiansToDegrees,
+    horizontalOffsetDeg:
+      Math.atan2(dot(localMoonDirection, localHorizontal), localRadial) *
+      radiansToDegrees,
+    verticalOffsetDeg:
+      Math.atan2(dot(localMoonDirection, localVertical), localRadial) *
+      radiansToDegrees,
     separationDeg: separation * radiansToDegrees,
     obscuration: circleOverlapFraction(moonRadius, sunRadius, separation),
     sunAltitudeDeg: horizontal.altitude,

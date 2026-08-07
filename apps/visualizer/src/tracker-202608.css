@@ -322,6 +322,40 @@ h2 { margin: 0; font-size: 1.15rem; letter-spacing: -0.025em; }
   will-change: transform;
 }
 
+.horizon-mask {
+  position: absolute;
+  z-index: 2;
+  top: 100%;
+  right: -2px;
+  left: -2px;
+  height: calc(100% + 2px);
+  border-top: 2px solid #bfc5cf;
+  background: linear-gradient(180deg, #747b87 0, #424954 70%);
+  box-shadow: 0 -2px 7px rgb(220 225 233 / 28%);
+  pointer-events: none;
+  will-change: top;
+}
+
+.horizon-marker {
+  position: absolute;
+  z-index: 4;
+  right: 50%;
+  bottom: 13px;
+  padding: 4px 7px;
+  border: 1px solid rgb(255 255 255 / 24%);
+  border-radius: 99px;
+  color: #f4f6f9;
+  background: rgb(9 13 23 / 78%);
+  font-size: 0.58rem;
+  font-weight: 850;
+  letter-spacing: 0.03em;
+  line-height: 1;
+  white-space: nowrap;
+  transform: translateX(50%);
+}
+
+.horizon-marker[hidden] { display: none; }
+
 .sky-position { display: grid; grid-column: 1 / -1; grid-template-columns: 1fr 1fr; gap: 8px; margin: 0; }
 .sky-position div { padding-top: 9px; border-top: 1px solid var(--line); }
 .sky-position dt { color: var(--muted); font-size: 0.62rem; }

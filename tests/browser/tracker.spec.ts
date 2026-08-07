@@ -261,6 +261,53 @@ test("does not invent a zero-zero observer when coordinates are absent", async (
   expect(new URL(page.url()).searchParams.has("lat")).toBe(false);
 });
 
+test("marks the solar preview when the Sun is below the horizon", async ({
+  page,
+}) => {
+  await page.goto(
+    "/tracker/202608/?lat=-33.8688&lon=151.2093&elevation=0&at=2026-08-12T17:46:00.000Z",
+  );
+
+  await expect(page.locator("#solar-disc")).toHaveAttribute(
+    "data-horizon",
+    "below",
+  );
+  await expect(page.locator("#solar-disc")).toHaveClass(/is-below-horizon/);
+  await expect(page.locator("#horizon-mask")).toHaveCSS("top", "0px");
+  await expect(page.locator("#horizon-marker")).toBeVisible();
+  await expect(page.locator("#horizon-marker")).toHaveText("Below horizon");
+  await expect(page.locator("#solar-disc")).toHaveAttribute(
+    "aria-label",
+    /degrees below the horizon/,
+  );
+});
+
+test("moves the horizon edge across the solar preview at sunset", async ({
+  page,
+}) => {
+  await page.goto(
+    "/tracker/202608/?lat=0&lon=5.2&elevation=0&at=2026-08-12T17:46:00.000Z",
+  );
+
+  await expect(page.locator("#solar-disc")).toHaveAttribute(
+    "data-horizon",
+    "crossing",
+  );
+  await expect(page.locator("#solar-disc")).toHaveClass(/is-horizon-crossing/);
+  await expect(page.locator("#horizon-marker")).toHaveText(
+    "Partly below horizon",
+  );
+  const edgePosition = await page.locator("#horizon-mask").evaluate((mask) =>
+    Number.parseFloat(getComputedStyle(mask).top),
+  );
+  expect(edgePosition).toBeGreaterThan(60);
+  expect(edgePosition).toBeLessThan(120);
+  await expect(page.locator("#solar-disc")).toHaveAttribute(
+    "aria-label",
+    /The horizon crosses the solar disc/,
+  );
+});
+
 test("uses a clearly labelled rough location only as a fallback", async ({
   page,
 }) => {

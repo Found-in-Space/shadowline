@@ -14,6 +14,7 @@ import type { TrackerShadowView } from "./tracker-shadow-view.js";
 import {
   configureOperationalDeltaT202608,
   solarDiscGeometry,
+  solarHorizonGeometry,
 } from "./tracker-astronomy.js";
 import { terrainElevationMeters } from "./tracker-terrain.js";
 import { TrackerWorkerClient } from "./tracker-worker-client.js";
@@ -73,6 +74,8 @@ const obscurationValue = element("obscuration-value");
 const phaseLabel = element("phase-label");
 const solarDisc = element("solar-disc");
 const moonDisc = element("moon-disc");
+const horizonMask = element("horizon-mask");
+const horizonMarker = element("horizon-marker");
 const sunAltitude = element("sun-altitude");
 const sunAzimuth = element("sun-azimuth");
 const previewTime = element("preview-time");
@@ -531,13 +534,23 @@ function renderDisc(atMs: number): void {
   if (!observer) {
     obscurationValue.textContent = "—";
     phaseLabel.textContent = "Choose your location";
+    horizonMask.style.top = "100%";
+    horizonMarker.hidden = true;
+    solarDisc.classList.remove("is-horizon-crossing", "is-below-horizon");
+    delete solarDisc.dataset.horizon;
     return;
   }
   try {
     const geometry = solarDiscGeometry(observer, new Date(atMs));
+    const horizon = solarHorizonGeometry(
+      geometry.sunAltitudeDeg,
+      geometry.sunRadiusDeg,
+    );
     const sunRadiusPixels = 66;
-    const x = (geometry.eastOffsetDeg / geometry.sunRadiusDeg) * sunRadiusPixels;
-    const y = -(geometry.northOffsetDeg / geometry.sunRadiusDeg) * sunRadiusPixels;
+    const x =
+      (geometry.horizontalOffsetDeg / geometry.sunRadiusDeg) * sunRadiusPixels;
+    const y =
+      -(geometry.verticalOffsetDeg / geometry.sunRadiusDeg) * sunRadiusPixels;
     const moonDiameter =
       2 * sunRadiusPixels * (geometry.moonRadiusDeg / geometry.sunRadiusDeg);
     moonDisc.style.width = `${moonDiameter}px`;
@@ -545,11 +558,27 @@ function renderDisc(atMs: number): void {
     moonDisc.style.transform = `translate(calc(-50% + ${x.toFixed(2)}px), calc(-50% + ${y.toFixed(2)}px))`;
     obscurationValue.textContent = `${(geometry.obscuration * 100).toFixed(1)}% covered`;
     phaseLabel.textContent = currentPhase(atMs);
+    horizonMask.style.top = `${horizon.edgePositionPercent.toFixed(2)}%`;
+    solarDisc.classList.toggle("is-horizon-crossing", horizon.state === "crossing");
+    solarDisc.classList.toggle("is-below-horizon", horizon.state === "below");
+    solarDisc.dataset.horizon = horizon.state;
+    horizonMarker.hidden = horizon.state === "above";
+    horizonMarker.textContent = horizon.state === "crossing"
+      ? "Partly below horizon"
+      : "Below horizon";
     sunAltitude.textContent = `${geometry.sunAltitudeDeg.toFixed(1)}°`;
     sunAzimuth.textContent = `${compassDirection(geometry.sunAzimuthDeg)} · ${geometry.sunAzimuthDeg.toFixed(1)}°`;
+    const horizonDescription = geometry.sunAltitudeDeg < 0
+      ? `${Math.abs(geometry.sunAltitudeDeg).toFixed(1)} degrees below the horizon`
+      : `${geometry.sunAltitudeDeg.toFixed(1)} degrees above the horizon`;
+    const horizonVisibilityDescription = horizon.state === "crossing"
+      ? "The horizon crosses the solar disc."
+      : horizon.state === "below"
+        ? "The Sun is entirely below the horizon."
+        : "";
     solarDisc.setAttribute(
       "aria-label",
-      `The Sun is predicted to be ${(geometry.obscuration * 100).toFixed(1)} percent covered. It is ${geometry.sunAltitudeDeg.toFixed(1)} degrees above the horizon.`,
+      `The Sun is predicted to be ${(geometry.obscuration * 100).toFixed(1)} percent covered. It is ${horizonDescription}. ${horizonVisibilityDescription}`.trim(),
     );
   } catch (error) {
     console.error(error);
