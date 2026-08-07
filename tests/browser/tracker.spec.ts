@@ -34,12 +34,15 @@ test("provides a mobile local eclipse field view and manual preview", async ({
   await expect(page.locator('a[href*="shadow-cones"]')).toHaveCount(0);
   await expect(page.locator("body")).not.toContainText("Shadowline tracker");
   await expect(page.locator("#contact-list li")).toHaveCount(5);
-  const firstContactCopy = await page
-    .locator("#contact-list li")
-    .first()
-    .locator("div")
-    .boundingBox();
-  expect(firstContactCopy?.width).toBeGreaterThan(150);
+  await expect
+    .poll(() =>
+      page
+        .locator("#contact-list li")
+        .first()
+        .locator("div")
+        .evaluate((element) => element.getBoundingClientRect().width),
+    )
+    .toBeGreaterThan(150);
   await expect(page.locator("#tracker-globe")).toHaveAttribute(
     "data-renderer-ready",
     "true",
@@ -47,6 +50,30 @@ test("provides a mobile local eclipse field view and manual preview", async ({
   await expect
     .poll(async () => Number((await page.locator("#tracker-globe").getAttribute("data-path-feature-count")) ?? 0))
     .toBeGreaterThan(0);
+
+  await page.getByRole("tab", { name: "Map" }).click();
+  await expect(page.locator("#tracker-map")).toHaveAttribute(
+    "data-renderer-ready",
+    "true",
+  );
+  await expect
+    .poll(async () => Number((await page.locator("#tracker-map").getAttribute("data-path-feature-count")) ?? 0))
+    .toBeGreaterThan(0);
+
+  await page.getByRole("tab", { name: "Shadow" }).click();
+  await expect(page.locator("#tracker-shadow canvas")).toHaveCount(1);
+  await expect(page.locator("#tracker-shadow")).toHaveAttribute(
+    "data-renderer-ready",
+    "true",
+  );
+  await page.getByRole("button", { name: "Earth + Moon" }).click();
+  await expect(page.getByRole("button", { name: "Earth + Moon" })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+
+  await page.getByRole("tab", { name: "Globe" }).click();
+  await expect(page.locator("#tracker-globe")).toBeVisible();
 
   await page.locator("#time-slider").evaluate((slider: HTMLInputElement) => {
     slider.value = String(Math.round(Number(slider.max) / 2));
@@ -56,7 +83,7 @@ test("provides a mobile local eclipse field view and manual preview", async ({
   await expect(page.locator("#obscuration-value")).not.toHaveText("—");
 
   await expect(page.locator("#offline-status")).toContainText(
-    "Ready for a poor connection",
+    /ready for a poor connection/i,
   );
   await context.setOffline(true);
   await page.reload({ waitUntil: "domcontentloaded" });
@@ -65,6 +92,36 @@ test("provides a mobile local eclipse field view and manual preview", async ({
   ).toBeVisible();
   await expect(page.getByText("You can see totality from this location.")).toBeVisible();
   await expect(page.locator("#clock-status")).toHaveText("Time checked earlier");
+  await page.getByRole("tab", { name: "Map" }).click();
+  await expect(page.locator("#tracker-map")).toHaveAttribute(
+    "data-renderer-ready",
+    "true",
+  );
+  await page.getByRole("tab", { name: "Shadow" }).click();
+  await expect(page.locator("#tracker-shadow canvas")).toHaveCount(1);
+});
+
+test("prepares optional views online without adding them to initial startup", async ({
+  page,
+}) => {
+  await page.goto("/tracker/202608/?lat=65.1411&lon=-25.3272&elevation=0");
+
+  const initiallyLoaded = await page.evaluate(() =>
+    performance
+      .getEntriesByType("resource")
+      .map((entry) => entry.name)
+      .filter((name) => /leaflet-renderer|tracker-shadow-view/.test(name)),
+  );
+  expect(initiallyLoaded).toEqual([]);
+
+  await expect
+    .poll(
+      () => page.locator("html").getAttribute("data-optional-views-ready"),
+      { timeout: 20_000 },
+    )
+    .toBe("true");
+  await expect(page.locator("#tracker-map")).toBeHidden();
+  await expect(page.locator("#tracker-shadow")).toBeHidden();
 });
 
 test("refines a missing observer elevation without blocking contacts", async ({

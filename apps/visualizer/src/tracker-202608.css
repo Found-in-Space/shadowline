@@ -40,7 +40,7 @@ a { -webkit-tap-highlight-color: transparent; }
 button:focus-visible,
 input:focus-visible,
 a:focus-visible,
-.tracker-globe:focus-visible,
+.tracker-overview-pane:focus-visible,
 summary:focus-visible {
   outline: 3px solid var(--gold);
   outline-offset: 3px;
@@ -362,9 +362,40 @@ h2 { margin: 0; font-size: 1.15rem; letter-spacing: -0.025em; }
 .globe-card { overflow: hidden; }
 .globe-heading { padding: 17px 15px 12px; }
 .drag-hint { align-self: flex-end; color: var(--muted); font-size: 0.58rem; white-space: nowrap; }
-.tracker-globe { position: relative; width: 100%; height: min(64vh, 480px); min-height: 330px; background: #111624; }
+.overview-tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; padding: 0 14px 12px; }
+.overview-tabs button {
+  min-height: 38px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  color: var(--muted);
+  background: rgb(255 255 255 / 4%);
+  cursor: pointer;
+  font-size: 0.68rem;
+  font-weight: 850;
+}
+.overview-tabs button[aria-selected="true"] { color: #25122d; border-color: transparent; background: var(--violet); }
+.overview-stage { position: relative; background: #111624; }
+.tracker-overview-pane { position: relative; width: 100%; height: min(64vh, 480px); min-height: 330px; background: #111624; }
+.tracker-overview-pane[hidden] { display: none; }
+.tracker-shadow canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+.shadow-camera-controls { position: absolute; z-index: 2; top: 10px; left: 10px; display: flex; gap: 5px; }
+.shadow-camera-controls button {
+  min-height: 32px;
+  padding: 5px 9px;
+  border: 1px solid rgb(255 255 255 / 18%);
+  border-radius: 8px;
+  color: var(--muted);
+  background: rgb(9 13 23 / 78%);
+  cursor: pointer;
+  font-size: 0.61rem;
+  font-weight: 850;
+  backdrop-filter: blur(10px);
+}
+.shadow-camera-controls button[aria-pressed="true"] { color: #25122d; border-color: transparent; background: var(--violet); }
+.overview-placeholder { position: absolute; inset: 0; display: grid; place-items: center; margin: 0; padding: 30px; color: var(--muted); text-align: center; }
 .tracker-globe .maplibregl-ctrl-attrib { font-size: 9px; }
 .tracker-globe .renderer-error { display: grid; place-items: center; height: 100%; padding: 30px; color: var(--muted); text-align: center; }
+.tracker-map .leaflet-control-attribution { font-size: 9px; }
 .globe-status { min-height: 34px; margin: 0; padding: 9px 14px; color: var(--muted); border-top: 1px solid var(--line); font-size: 0.66rem; line-height: 1.4; }
 
 .field-note,
@@ -398,7 +429,7 @@ noscript { display: block; padding: 20px; color: var(--danger); text-align: cent
   .tracker-header { padding-inline: 28px; }
   .tracker-shell { grid-template-columns: minmax(0, 1.05fr) minmax(430px, 0.82fr); align-items: start; }
   .overview-column { position: sticky; top: 88px; }
-  .tracker-globe { height: min(55vh, 520px); }
+  .tracker-overview-pane { height: min(55vh, 520px); }
 }
 
 @media (max-width: 420px) {

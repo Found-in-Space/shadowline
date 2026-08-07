@@ -23,6 +23,7 @@ import {
   earthFixedToEquatorialJ2000Basis,
 } from "./celestial-frame.js";
 import { configureOperationalDeltaT202608 } from "./tracker-astronomy.js";
+import type { SpacefarerFrame } from "./spacefarer-frame.js";
 
 interface FrameRequest {
   type: "frame";
@@ -79,7 +80,7 @@ function ringPoints(
   );
 }
 
-function frame(atUtc: string, angularIntervalDegrees = 3) {
+function frame(atUtc: string, angularIntervalDegrees = 3): SpacefarerFrame {
   const sunEcefKm = kilometres("sun", atUtc);
   const moonEcefKm = kilometres("moon", atUtc);
   const direction = normalize(subtract(moonEcefKm, sunEcefKm));

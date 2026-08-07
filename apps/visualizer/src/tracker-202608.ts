@@ -8,6 +8,8 @@ import type {
   Observer,
 } from "@found-in-space/shadowline";
 import { MapLibreGlobeRenderer } from "./maplibre-renderer.js";
+import type { LeafletMercatorRenderer } from "./leaflet-renderer.js";
+import type { TrackerShadowView } from "./tracker-shadow-view.js";
 import {
   configureOperationalDeltaT202608,
   solarDiscGeometry,
@@ -33,6 +35,7 @@ interface NamedContact {
 }
 
 type LocationSource = "gps" | "geoip" | "manual" | "map" | "saved";
+type OverviewView = "globe" | "map" | "shadow";
 
 interface ApproximateLocationResponse {
   available?: unknown;
@@ -77,6 +80,17 @@ const timeSlider = element<HTMLInputElement>("time-slider");
 const liveButton = element<HTMLButtonElement>("live-button");
 const contactList = element<HTMLOListElement>("contact-list");
 const globeStatus = element("globe-status");
+const overviewHint = element("overview-hint");
+const overviewTabs: Record<OverviewView, HTMLButtonElement> = {
+  globe: element<HTMLButtonElement>("globe-tab"),
+  map: element<HTMLButtonElement>("map-tab"),
+  shadow: element<HTMLButtonElement>("shadow-tab"),
+};
+const overviewPanes: Record<OverviewView, HTMLElement> = {
+  globe: element("tracker-globe"),
+  map: element("tracker-map"),
+  shadow: element("tracker-shadow"),
+};
 
 configureOperationalDeltaT202608();
 const worker = new TrackerWorkerClient();
@@ -98,6 +112,152 @@ let locationVersion = 0;
 let shadowVersion = 0;
 let lastShadowBucket = Number.NaN;
 let lastDiscBucket = Number.NaN;
+let activeOverviewView: OverviewView = "globe";
+let mercator: LeafletMercatorRenderer | null = null;
+let shadowView: TrackerShadowView | null = null;
+let instantaneousScene: EclipseScene | null = null;
+let globeOverviewStatus = "Working out the eclipse path…";
+let shadowOverviewStatus = "Preparing the physical shadow view…";
+let offlineCoreReady = false;
+let mercatorModulePromise: Promise<typeof import("./leaflet-renderer.js")> | null = null;
+let shadowModulePromise: Promise<typeof import("./tracker-shadow-view.js")> | null = null;
+
+function loadMercatorModule(): Promise<typeof import("./leaflet-renderer.js")> {
+  mercatorModulePromise ??= import("./leaflet-renderer.js");
+  return mercatorModulePromise;
+}
+
+function loadShadowModule(): Promise<typeof import("./tracker-shadow-view.js")> {
+  shadowModulePromise ??= import("./tracker-shadow-view.js");
+  return shadowModulePromise;
+}
+
+function currentTrackerTime(): number {
+  return followLive ? monotonicEpochNow() : previewTimeMs;
+}
+
+function showOverviewStatus(): void {
+  if (activeOverviewView === "globe") {
+    globeStatus.textContent = globeOverviewStatus;
+    overviewHint.textContent = "Drag to explore · tap to choose a location";
+  } else if (activeOverviewView === "map") {
+    globeStatus.textContent = mercator
+      ? "Use the map for a closer look. Tap anywhere to calculate the eclipse there."
+      : "Preparing the map…";
+    overviewHint.textContent = "Drag to move · pinch to zoom · tap to choose";
+  } else {
+    globeStatus.textContent = shadowOverviewStatus;
+    overviewHint.textContent = "Drag to turn · pinch to zoom";
+  }
+}
+
+async function ensureMercator(): Promise<LeafletMercatorRenderer> {
+  if (mercator) return mercator;
+  const module = await loadMercatorModule();
+  const initialLatitude = observer?.latitudeDeg ?? event?.peakLocation?.latitudeDeg ?? 60;
+  const initialLongitude = observer?.longitudeDeg ?? event?.peakLocation?.longitudeDeg ?? -20;
+  mercator = new module.LeafletMercatorRenderer(overviewPanes.map, {
+    latitude: initialLatitude,
+    longitude: initialLongitude,
+    zoom: observer ? 5 : 2,
+  });
+  mercator.onLocation = (selected) => {
+    void setObserver(selected, "map", true);
+  };
+  if (overviewScene) {
+    mercator.showPath(overviewScene);
+    mercator.showGlobalVisibility(overviewScene);
+    mercator.showPeak(
+      event?.peakLocation?.latitudeDeg,
+      event?.peakLocation?.longitudeDeg,
+    );
+    if (!observer) mercator.fitPath();
+  }
+  if (instantaneousScene) mercator.showShadowOutline(instantaneousScene);
+  if (observer) mercator.setLocation(observer);
+  return mercator;
+}
+
+async function ensureShadowView(): Promise<TrackerShadowView> {
+  if (shadowView) return shadowView;
+  const module = await loadShadowModule();
+  shadowView = new module.TrackerShadowView(overviewPanes.shadow, {
+    onStatus: (message) => {
+      shadowOverviewStatus = message;
+      if (activeOverviewView === "shadow") showOverviewStatus();
+    },
+  });
+  shadowView.setTime(currentTrackerTime());
+  return shadowView;
+}
+
+async function selectOverviewView(view: OverviewView, focus = false): Promise<void> {
+  activeOverviewView = view;
+  for (const [name, tab] of Object.entries(overviewTabs) as [OverviewView, HTMLButtonElement][]) {
+    const selected = name === view;
+    tab.setAttribute("aria-selected", String(selected));
+    tab.tabIndex = selected ? 0 : -1;
+    overviewPanes[name].hidden = !selected;
+  }
+  shadowView?.setActive(view === "shadow");
+  showOverviewStatus();
+  try {
+    if (view === "map") await ensureMercator();
+    if (view === "shadow") {
+      const renderer = await ensureShadowView();
+      renderer.setActive(true);
+      renderer.setTime(currentTrackerTime());
+    }
+    showOverviewStatus();
+  } catch (error) {
+    console.error(error);
+    globeStatus.textContent = view === "map"
+      ? "The map could not load. The globe is still available."
+      : "The physical shadow view could not load. The globe is still available.";
+  }
+  if (focus) overviewPanes[view].focus({ preventScroll: true });
+}
+
+function connectionAllowsBackgroundLoad(): boolean {
+  const connection = (navigator as Navigator & {
+    connection?: { saveData?: boolean; effectiveType?: string };
+  }).connection;
+  return navigator.onLine && connection?.saveData !== true && connection?.effectiveType !== "slow-2g";
+}
+
+function scheduleWhenIdle(task: () => Promise<unknown>, delayMs: number): void {
+  window.setTimeout(() => {
+    if (!connectionAllowsBackgroundLoad()) return;
+    const run = () => void task().catch(() => {
+      // Optional views still load on demand if background preparation fails.
+    });
+    const idleCallback = (window as Window & {
+      requestIdleCallback?: Window["requestIdleCallback"];
+    }).requestIdleCallback;
+    if (idleCallback) {
+      idleCallback(run, { timeout: 12_000 });
+    } else {
+      globalThis.setTimeout(run, 1_000);
+    }
+  }, delayMs);
+}
+
+function scheduleOptionalViewPreload(): void {
+  const schedule = () => {
+    scheduleWhenIdle(() => loadMercatorModule(), 2_000);
+    scheduleWhenIdle(async () => {
+      await loadMercatorModule();
+      const module = await loadShadowModule();
+      await module.preloadTrackerShadowAssets();
+      document.documentElement.dataset.optionalViewsReady = "true";
+      if (offlineCoreReady) {
+        offlineStatus.textContent = "Ready for a poor connection. All three views are saved; places you view on the map are saved as you go.";
+      }
+    }, 7_000);
+  };
+  if (document.readyState === "complete") schedule();
+  else window.addEventListener("load", schedule, { once: true });
+}
 
 function monotonicEpochNow(): number {
   return performance.timeOrigin + performance.now() + clockOffsetMs;
@@ -310,16 +470,24 @@ function updatePreviewReadout(atMs: number): void {
 
 async function updateShadow(atMs: number): Promise<void> {
   if (!event || atMs < rangeStartMs - 3_600_000 || atMs > rangeEndMs + 3_600_000) {
+    instantaneousScene = null;
     globe.clearShadowOutline();
+    mercator?.clearShadowOutline();
     return;
   }
   const version = ++shadowVersion;
   try {
     const result = await worker.calculateShadow(new Date(atMs).toISOString());
     if (version !== shadowVersion) return;
+    instantaneousScene = result.scene;
     globe.showShadowOutline(result.scene);
+    mercator?.showShadowOutline(result.scene);
   } catch {
-    if (version === shadowVersion) globe.clearShadowOutline();
+    if (version === shadowVersion) {
+      instantaneousScene = null;
+      globe.clearShadowOutline();
+      mercator?.clearShadowOutline();
+    }
   }
 }
 
@@ -349,6 +517,7 @@ function renderFrame(): void {
     lastShadowBucket = shadowBucket;
     void updateShadow(atMs);
   }
+  if (activeOverviewView === "shadow") shadowView?.setTime(atMs);
 }
 
 function updateRange(): void {
@@ -376,6 +545,7 @@ async function setObserver(
   localEclipse = null;
   localCalculationPending = true;
   globe.setLocation(nextObserver);
+  mercator?.setLocation(nextObserver);
   locationLabel.textContent = source === "gps"
     ? "Location from GPS"
     : source === "geoip"
@@ -576,7 +746,11 @@ async function initializeModel(): Promise<void> {
     globe.showGlobalVisibility(result.scene);
     globe.showPeak(result.event.peakLocation?.latitudeDeg, result.event.peakLocation?.longitudeDeg);
     globe.fitPath();
-    globeStatus.textContent = "Purple shows where the Sun will be completely covered. The shaded areas show where the Moon will cover part or all of the Sun at the chosen time.";
+    mercator?.showPath(result.scene);
+    mercator?.showGlobalVisibility(result.scene);
+    mercator?.showPeak(result.event.peakLocation?.latitudeDeg, result.event.peakLocation?.longitudeDeg);
+    globeOverviewStatus = "Purple shows where the Sun will be completely covered. The shaded areas show where the Moon will cover part or all of the Sun at the chosen time.";
+    showOverviewStatus();
     updateRange();
     renderFrame();
     const urlObserver = observerFromUrl();
@@ -598,7 +772,8 @@ async function initializeModel(): Promise<void> {
     }
   } catch (error) {
     console.error(error);
-    globeStatus.textContent = "The eclipse map could not load. Reload the page to try again.";
+    globeOverviewStatus = "The eclipse map could not load. Reload the page to try again.";
+    showOverviewStatus();
   }
 }
 
@@ -672,7 +847,10 @@ async function prepareOffline(): Promise<void> {
     });
     if (navigator.onLine) await registration.update();
     await navigator.serviceWorker.ready;
-    offlineStatus.textContent = "Ready for a poor connection. Places you view on the map will be saved as you go.";
+    offlineCoreReady = true;
+    offlineStatus.textContent = document.documentElement.dataset.optionalViewsReady === "true"
+      ? "Ready for a poor connection. All three views are saved; places you view on the map are saved as you go."
+      : "The main tracker is ready for a poor connection. The map and shadow views will be saved quietly while you are online.";
   } catch {
     offlineStatus.textContent = "Offline setup did not finish. Keep this page open if your connection may drop.";
   }
@@ -741,6 +919,30 @@ globe.onLocation = (selected) => {
   void setObserver(selected, "map", true);
 };
 
+const overviewViewOrder: OverviewView[] = ["globe", "map", "shadow"];
+for (const [view, tab] of Object.entries(overviewTabs) as [OverviewView, HTMLButtonElement][]) {
+  tab.addEventListener("click", () => {
+    void selectOverviewView(view);
+  });
+  tab.addEventListener("keydown", (keyboardEvent) => {
+    const currentIndex = overviewViewOrder.indexOf(view);
+    const targetIndex = keyboardEvent.key === "ArrowRight"
+      ? (currentIndex + 1) % overviewViewOrder.length
+      : keyboardEvent.key === "ArrowLeft"
+        ? (currentIndex - 1 + overviewViewOrder.length) % overviewViewOrder.length
+        : keyboardEvent.key === "Home"
+          ? 0
+          : keyboardEvent.key === "End"
+            ? overviewViewOrder.length - 1
+            : -1;
+    if (targetIndex < 0) return;
+    keyboardEvent.preventDefault();
+    const targetView = overviewViewOrder[targetIndex]!;
+    overviewTabs[targetView].focus();
+    void selectOverviewView(targetView);
+  });
+}
+
 timeSlider.addEventListener("input", () => {
   setPreview(rangeStartMs + Number(timeSlider.value) * 1000);
 });
@@ -766,6 +968,7 @@ window.addEventListener("online", () => {
   updateNetworkStatus();
   void syncClock();
   void resolveApproximateLocation();
+  scheduleOptionalViewPreload();
 });
 window.addEventListener("offline", updateNetworkStatus);
 document.addEventListener("visibilitychange", () => {
@@ -780,5 +983,6 @@ renderFrame();
 void initializeModel();
 void syncClock();
 void prepareOffline();
+scheduleOptionalViewPreload();
 window.setInterval(renderFrame, 250);
 window.setInterval(() => void syncClock(), CLOCK_RESYNC_INTERVAL_MS);

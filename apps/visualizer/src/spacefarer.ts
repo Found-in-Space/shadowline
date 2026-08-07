@@ -19,23 +19,7 @@ import {
 } from "./earth-ellipsoid.js";
 import { FreeSpaceControls } from "./free-space-controls.js";
 import { inwardSurfaceRibbon } from "./surface-ribbon.js";
-
-interface ShadowFrame {
-  event: EclipseSummary;
-  atUtc: string;
-  sunEcefKm: CartesianVector;
-  moonEcefKm: CartesianVector;
-  direction: CartesianVector;
-  ecefToEquatorialJ2000: CartesianBasis;
-  sunMoonDistanceKm: number;
-  moonEarthDistanceKm: number;
-  axisDistanceToEarthPlaneKm: number;
-  umbraRadiusAtEarthPlaneKm: number;
-  penumbraRadiusAtEarthPlaneKm: number;
-  centralKind: "umbra" | "antumbra" | null;
-  penumbraRings: CartesianVector[][];
-  centralRings: CartesianVector[][];
-}
+import type { SpacefarerFrame as ShadowFrame } from "./spacefarer-frame.js";
 
 type WorkerResponse =
   | { type: "ready"; event: EclipseSummary }

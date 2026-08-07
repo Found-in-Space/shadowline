@@ -123,9 +123,20 @@
         <section class="globe-card" aria-labelledby="globe-heading">
           <div class="globe-heading">
             <div><p class="eyebrow">The Moon’s moving shadow</p><h2 id="globe-heading">Watch it cross Earth</h2></div>
-            <span class="drag-hint">Drag to explore · tap to choose a location</span>
+            <span id="overview-hint" class="drag-hint">Drag to explore · tap to choose a location</span>
           </div>
-          <div id="tracker-globe" class="tracker-globe" tabindex="0"></div>
+          <div class="overview-tabs" role="tablist" aria-label="Choose how to view the eclipse">
+            <button id="globe-tab" type="button" role="tab" aria-selected="true" aria-controls="tracker-globe">Globe</button>
+            <button id="map-tab" type="button" role="tab" aria-selected="false" aria-controls="tracker-map" tabindex="-1">Map</button>
+            <button id="shadow-tab" type="button" role="tab" aria-selected="false" aria-controls="tracker-shadow" tabindex="-1">Shadow</button>
+          </div>
+          <div class="overview-stage">
+            <div id="tracker-globe" class="tracker-overview-pane tracker-globe" role="tabpanel" aria-labelledby="globe-tab" tabindex="0"></div>
+            <div id="tracker-map" class="tracker-overview-pane tracker-map" role="tabpanel" aria-labelledby="map-tab" tabindex="0" hidden></div>
+            <div id="tracker-shadow" class="tracker-overview-pane tracker-shadow" role="tabpanel" aria-labelledby="shadow-tab" tabindex="0" hidden>
+              <p class="overview-placeholder">Preparing the physical shadow view…</p>
+            </div>
+          </div>
           <p id="globe-status" class="globe-status" role="status">Working out the eclipse path…</p>
         </section>
 
