@@ -34,6 +34,12 @@ test("provides a mobile local eclipse field view and manual preview", async ({
   await expect(page.locator('a[href*="shadow-cones"]')).toHaveCount(0);
   await expect(page.locator("body")).not.toContainText("Shadowline tracker");
   await expect(page.locator("#contact-list li")).toHaveCount(5);
+  const firstContactCopy = await page
+    .locator("#contact-list li")
+    .first()
+    .locator("div")
+    .boundingBox();
+  expect(firstContactCopy?.width).toBeGreaterThan(150);
   await expect(page.locator("#tracker-globe")).toHaveAttribute(
     "data-renderer-ready",
     "true",

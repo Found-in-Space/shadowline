@@ -407,7 +407,7 @@ noscript { display: block; padding: 20px; color: var(--danger); text-align: cent
   .disc-card { grid-template-columns: minmax(74px, 1fr) 124px; }
   .solar-disc { width: 120px; height: 120px; }
   .contact-list { margin-top: 8px; }
-  .contact-list li { grid-template-columns: 34px minmax(0, 1fr) auto; gap: 6px; }
+  .contact-list li { grid-template-columns: minmax(0, 1fr) auto; gap: 12px; }
   .contact-list time { font-size: 0.68rem; }
   .drag-hint { display: none; }
 }
