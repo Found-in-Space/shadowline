@@ -47,6 +47,28 @@ test("provides a mobile local eclipse field view and manual preview", async ({
     "data-renderer-ready",
     "true",
   );
+  for (const layer of [
+    "center-and-limits",
+    "local-penumbra",
+    "local-central-shadow",
+  ]) {
+    await expect(page.locator("#tracker-globe")).toHaveAttribute(
+      `data-layer-${layer}`,
+      "true",
+    );
+  }
+  for (const layer of [
+    "central-path",
+    "partial-extent",
+    "horizon-limits",
+    "contacts",
+    "time-markers",
+  ]) {
+    await expect(page.locator("#tracker-globe")).toHaveAttribute(
+      `data-layer-${layer}`,
+      "false",
+    );
+  }
   await expect
     .poll(async () => Number((await page.locator("#tracker-globe").getAttribute("data-path-feature-count")) ?? 0))
     .toBeGreaterThan(0);
@@ -57,6 +79,9 @@ test("provides a mobile local eclipse field view and manual preview", async ({
   });
   await expect(page.locator("#mode-badge")).toHaveText("PREVIEW");
   await expect(page.locator("#obscuration-value")).not.toHaveText("—");
+  await expect
+    .poll(async () => Number((await page.locator("#tracker-globe").getAttribute("data-shadow-feature-count")) ?? 0))
+    .toBeGreaterThan(0);
 
   await page.getByRole("tab", { name: "Map" }).click();
   await expect(page.locator("#tracker-map")).toHaveAttribute(
@@ -65,6 +90,27 @@ test("provides a mobile local eclipse field view and manual preview", async ({
   );
   await expect
     .poll(async () => Number((await page.locator("#tracker-map").getAttribute("data-path-feature-count")) ?? 0))
+    .toBeGreaterThan(0);
+  for (const layer of [
+    "central-path",
+    "partial-extent",
+    "horizon-limits",
+    "contacts",
+    "center-and-limits",
+    "local-penumbra",
+    "local-central-shadow",
+  ]) {
+    await expect(page.locator("#tracker-map")).toHaveAttribute(
+      `data-layer-${layer}`,
+      "true",
+    );
+  }
+  await expect(page.locator("#tracker-map")).toHaveAttribute(
+    "data-layer-time-markers",
+    "false",
+  );
+  await expect
+    .poll(async () => Number((await page.locator("#tracker-map").getAttribute("data-shadow-feature-count")) ?? 0))
     .toBeGreaterThan(0);
   await expect(page.locator("#tracker-map")).toHaveAttribute(
     "data-following-shadow",

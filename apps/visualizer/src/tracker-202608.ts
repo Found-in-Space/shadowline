@@ -97,6 +97,16 @@ const overviewPanes: Record<OverviewView, HTMLElement> = {
 configureOperationalDeltaT202608();
 const worker = new TrackerWorkerClient();
 const globe = new MapLibreGlobeRenderer(element("tracker-globe"));
+globe.setLayerVisibility({
+  centralPath: false,
+  partialExtent: false,
+  horizonLimits: false,
+  contacts: false,
+  localPenumbra: true,
+  localCentralShadow: true,
+  centerAndLimits: true,
+  timeMarkers: false,
+});
 
 let event: EclipseSummary | null = null;
 let overviewScene: EclipseScene | null = null;
@@ -233,6 +243,16 @@ async function ensureMercator(): Promise<LeafletMercatorRenderer> {
     latitude: initialLatitude,
     longitude: initialLongitude,
     zoom: observer ? 5 : 2,
+  });
+  mercator.setLayerVisibility({
+    centralPath: true,
+    partialExtent: true,
+    horizonLimits: true,
+    contacts: true,
+    localPenumbra: true,
+    localCentralShadow: true,
+    centerAndLimits: true,
+    timeMarkers: false,
   });
   mercator.onLocation = (selected) => {
     void setObserver(selected, "map", true);
@@ -828,8 +848,8 @@ async function initializeModel(): Promise<void> {
     overviewScene = result.scene;
     globe.showPath(result.scene);
     globe.showGlobalVisibility(result.scene);
-    globe.showPeak(result.event.peakLocation?.latitudeDeg, result.event.peakLocation?.longitudeDeg);
     globe.fitPath();
+    globe.showPeak(undefined, undefined);
     mercator?.showPath(result.scene);
     mercator?.showGlobalVisibility(result.scene);
     mercator?.showPeak(result.event.peakLocation?.latitudeDeg, result.event.peakLocation?.longitudeDeg);
