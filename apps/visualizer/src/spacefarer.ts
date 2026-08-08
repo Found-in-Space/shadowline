@@ -11,13 +11,20 @@ import {
 } from "@found-in-space/shadowline";
 import type { CartesianBasis } from "./celestial-frame.js";
 import {
-  WGS84_DISPLAY_AXES,
+  VISIBLE_SUN_FAR,
+  createVisibleSun,
+} from "./visible-sun.js";
+import {
   createGeodeticEllipsoidGeometry,
   ecefKmToDisplay,
   geodeticDisplayPosition,
   projectDirectionToWgs84Display,
 } from "./earth-ellipsoid.js";
 import { FreeSpaceControls } from "./free-space-controls.js";
+import {
+  createEarthClippedShadowCones,
+  perpendicularBasis,
+} from "./shadow-cone.js";
 import { inwardSurfaceRibbon } from "./surface-ribbon.js";
 import type { SpacefarerFrame as ShadowFrame } from "./spacefarer-frame.js";
 
@@ -30,7 +37,6 @@ type WorkerResponse =
 
 type ViewPreset = "system" | "earth" | "moon" | "shadow";
 
-const SUN_DISC_DISTANCE = 650;
 const siteRoot = new URL(/* @vite-ignore */ "../", import.meta.url);
 const siteAssetUrl = (name: string): string => new URL(name, siteRoot).href;
 const element = <T extends HTMLElement>(id: string): T => {
@@ -80,7 +86,7 @@ const camera = new THREE.PerspectiveCamera(
   42,
   window.innerWidth / window.innerHeight,
   0.02,
-  1200,
+  VISIBLE_SUN_FAR,
 );
 camera.position.set(0, 17, 52);
 camera.lookAt(-30, 0, 0);
@@ -166,81 +172,8 @@ function withLogarithmicDepthBias<T extends THREE.Material>(
   return material;
 }
 
-function deterministicStars(): THREE.Points {
-  let seed = 975318642;
-  const random = () => {
-    seed = (seed * 1664525 + 1013904223) >>> 0;
-    return seed / 0xffffffff;
-  };
-  const positions: number[] = [];
-  const colors: number[] = [];
-  const color = new THREE.Color();
-  for (let index = 0; index < 1250; index += 1) {
-    const cosine = random() * 2 - 1;
-    const sine = Math.sqrt(1 - cosine * cosine);
-    const angle = random() * Math.PI * 2;
-    positions.push(
-      720 * sine * Math.cos(angle),
-      720 * cosine,
-      720 * sine * Math.sin(angle),
-    );
-    color.setHSL(0.54 + random() * 0.1, 0.2, 0.55 + random() * 0.4);
-    colors.push(color.r, color.g, color.b);
-  }
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute(
-    "position",
-    new THREE.Float32BufferAttribute(positions, 3),
-  );
-  geometry.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
-  return new THREE.Points(
-    geometry,
-    new THREE.PointsMaterial({
-      size: 0.9,
-      sizeAttenuation: true,
-      vertexColors: true,
-      transparent: true,
-      opacity: 0.82,
-      depthWrite: false,
-    }),
-  );
-}
-
-function sunTexture(): THREE.CanvasTexture {
-  const canvas = document.createElement("canvas");
-  canvas.width = 256;
-  canvas.height = 256;
-  const context = canvas.getContext("2d");
-  if (!context) throw new Error("Canvas textures are unavailable.");
-  const glow = context.createRadialGradient(128, 128, 6, 128, 128, 128);
-  glow.addColorStop(0, "rgba(255,255,242,1)");
-  glow.addColorStop(0.43, "rgba(255,224,138,1)");
-  glow.addColorStop(0.5, "rgba(255,184,70,0.98)");
-  glow.addColorStop(0.58, "rgba(255,177,62,0.24)");
-  glow.addColorStop(0.77, "rgba(255,143,38,0.06)");
-  glow.addColorStop(1, "rgba(255,120,24,0)");
-  context.fillStyle = glow;
-  context.fillRect(0, 0, 256, 256);
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.colorSpace = THREE.SRGBColorSpace;
-  return texture;
-}
-
-const celestialLayer = new THREE.Group();
-const stars = deterministicStars();
-const sunDisc = new THREE.Sprite(
-  new THREE.SpriteMaterial({
-    map: sunTexture(),
-    color: 0xffffff,
-    transparent: true,
-    depthTest: true,
-    depthWrite: false,
-    blending: THREE.AdditiveBlending,
-  }),
-);
-sunDisc.renderOrder = -5;
-celestialLayer.add(stars, sunDisc);
-scene.add(celestialLayer);
+const visibleSun = createVisibleSun();
+scene.add(visibleSun.object);
 
 const earthFixedGroup = new THREE.Group();
 earthFixedGroup.matrixAutoUpdate = false;
@@ -443,117 +376,6 @@ function addSurfaceBoundary(
   ringLayer.add(mesh);
 }
 
-function perpendicularBasis(
-  axis: THREE.Vector3,
-): [THREE.Vector3, THREE.Vector3] {
-  const reference =
-    Math.abs(axis.y) < 0.82
-      ? new THREE.Vector3(0, 1, 0)
-      : new THREE.Vector3(1, 0, 0);
-  const first = new THREE.Vector3().crossVectors(axis, reference).normalize();
-  const second = new THREE.Vector3().crossVectors(axis, first).normalize();
-  return [first, second];
-}
-
-function coneSurface(
-  start: THREE.Vector3,
-  axis: THREE.Vector3,
-  displayLength: number,
-  slope: number,
-  color: number,
-  opacity: number,
-): THREE.Mesh {
-  const radialSegments = 180;
-  const lengthSegments = 96;
-  const [first, second] = perpendicularBasis(axis);
-  const positions: number[] = [];
-  const indices: number[] = [];
-  for (let alongIndex = 0; alongIndex <= lengthSegments; alongIndex += 1) {
-    const along = (displayLength * alongIndex) / lengthSegments;
-    const physicalAlongKm = along * EARTH_MEAN_RADIUS_KM;
-    const physicalRadiusKm = MOON_RADIUS_KM + slope * physicalAlongKm;
-    const displayRadius = Math.abs(physicalRadiusKm) / EARTH_MEAN_RADIUS_KM;
-    const center = start.clone().addScaledVector(axis, along);
-    for (let radialIndex = 0; radialIndex <= radialSegments; radialIndex += 1) {
-      const angle = (radialIndex / radialSegments) * Math.PI * 2;
-      const point = center
-        .clone()
-        .addScaledVector(first, Math.cos(angle) * displayRadius)
-        .addScaledVector(second, Math.sin(angle) * displayRadius);
-      positions.push(point.x, point.y, point.z);
-    }
-  }
-  const row = radialSegments + 1;
-  for (let alongIndex = 0; alongIndex < lengthSegments; alongIndex += 1) {
-    for (let radialIndex = 0; radialIndex < radialSegments; radialIndex += 1) {
-      const firstIndex = alongIndex * row + radialIndex;
-      const nextIndex = firstIndex + row;
-      indices.push(
-        firstIndex,
-        nextIndex,
-        firstIndex + 1,
-        nextIndex,
-        nextIndex + 1,
-        firstIndex + 1,
-      );
-    }
-  }
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute(
-    "position",
-    new THREE.Float32BufferAttribute(positions, 3),
-  );
-  geometry.setIndex(indices);
-  geometry.computeVertexNormals();
-  const material = new THREE.MeshBasicMaterial({
-    color,
-    transparent: true,
-    opacity,
-    side: THREE.DoubleSide,
-    depthWrite: false,
-    blending: THREE.AdditiveBlending,
-  });
-  material.onBeforeCompile = (shader) => {
-    shader.uniforms["stageToEarthFixed"] = {
-      value: stageToEarthFixed,
-    };
-    shader.uniforms["wgs84DisplayAxes"] = {
-      value: WGS84_DISPLAY_AXES,
-    };
-    shader.vertexShader = shader.vertexShader
-      .replace(
-        "#include <common>",
-        `#include <common>
-varying vec3 vStagePosition;`,
-      )
-      .replace(
-        "#include <begin_vertex>",
-        `#include <begin_vertex>
-vStagePosition = transformed;`,
-      );
-    shader.fragmentShader = shader.fragmentShader
-      .replace(
-        "#include <common>",
-        `#include <common>
-uniform mat4 stageToEarthFixed;
-uniform vec3 wgs84DisplayAxes;
-varying vec3 vStagePosition;`,
-      )
-      .replace(
-        "#include <clipping_planes_fragment>",
-        `#include <clipping_planes_fragment>
-vec3 earthFixedPosition =
-  ( stageToEarthFixed * vec4( vStagePosition, 1.0 ) ).xyz;
-vec3 ellipsoidPosition = earthFixedPosition / wgs84DisplayAxes;
-if ( dot( ellipsoidPosition, ellipsoidPosition ) < 1.0 ) discard;`,
-      );
-  };
-  material.customProgramCacheKey = () => "spacefarer-wgs84-cone-clip-v1";
-  const mesh = new THREE.Mesh(geometry, material);
-  mesh.renderOrder = 3;
-  return mesh;
-}
-
 function line(
   points: THREE.Vector3[],
   color: number,
@@ -612,7 +434,11 @@ function updateCameraClipping(): void {
     0.00001,
     Math.min(0.02, nearestSurfaceDistance() * 0.003),
   );
-  const nextFar = Math.max(1200, earthDistance * 3, moonDistance * 3);
+  const nextFar = Math.max(
+    VISIBLE_SUN_FAR,
+    earthDistance * 3,
+    moonDistance * 3,
+  );
   const nearChanged = Math.abs(camera.near - nextNear) > nextNear * 0.08;
   const farChanged = Math.abs(camera.far - nextFar) > nextFar * 0.08;
   if (nearChanged || farChanged) {
@@ -657,29 +483,15 @@ function updateCones(frameValue: ShadowFrame): void {
   clearLayer(guideLayer);
   const coneLength =
     frameValue.axisDistanceToEarthPlaneKm / EARTH_MEAN_RADIUS_KM + 2.3;
-  const penumbraSlope =
-    (SUN_RADIUS_KM + MOON_RADIUS_KM) / frameValue.sunMoonDistanceKm;
-  const umbraSlope =
-    -(SUN_RADIUS_KM - MOON_RADIUS_KM) / frameValue.sunMoonDistanceKm;
   coneLayer.add(
-    coneSurface(
-      moonStagePosition,
-      shadowAxisStage,
-      coneLength,
-      penumbraSlope,
-      0xf2b94d,
-      0.13,
-    ),
-  );
-  coneLayer.add(
-    coneSurface(
-      moonStagePosition,
-      shadowAxisStage,
-      coneLength,
-      umbraSlope,
-      0x9d7cff,
-      0.26,
-    ),
+    ...createEarthClippedShadowCones({
+      moonPosition: moonStagePosition,
+      shadowAxis: shadowAxisStage,
+      displayLength: coneLength,
+      sunMoonDistanceKm: frameValue.sunMoonDistanceKm,
+      coneToEarthFixed: stageToEarthFixed,
+      quality: "high",
+    }),
   );
   guideLayer.add(
     line(
@@ -1006,18 +818,11 @@ document.addEventListener("visibilitychange", () => {
   previousRenderTimeMs = performance.now();
 });
 
-const cameraWorldPosition = new THREE.Vector3();
-function updateCelestialLayer(): void {
+function updateVisibleSun(): void {
   const viewCamera = renderer.xr.isPresenting
     ? renderer.xr.getCamera()
     : camera;
-  viewCamera.getWorldPosition(cameraWorldPosition);
-  stars.position.copy(cameraWorldPosition);
-  sunDisc.position
-    .copy(cameraWorldPosition)
-    .addScaledVector(sunDirectionStage, SUN_DISC_DISTANCE);
-  const planeSize = 4 * SUN_DISC_DISTANCE * Math.tan(sunAngularRadiusRad);
-  sunDisc.scale.set(planeSize, planeSize, 1);
+  visibleSun.update(viewCamera, sunDirectionStage, sunAngularRadiusRad);
 }
 
 function render(nowMs: number): void {
@@ -1035,7 +840,7 @@ function render(nowMs: number): void {
   controls.update(elapsedMs / 1000);
   if (renderer.xr.isPresenting) updateXrNavigation(elapsedMs / 1000);
   updateCameraClipping();
-  updateCelestialLayer();
+  updateVisibleSun();
   renderer.render(scene, camera);
 }
 

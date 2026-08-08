@@ -10,6 +10,14 @@ import {
   createGeodeticEllipsoidGeometry,
   ecefKmToDisplay,
 } from "./earth-ellipsoid.js";
+import {
+  VISIBLE_SUN_FAR,
+  createVisibleSun,
+} from "./visible-sun.js";
+import {
+  createEarthClippedShadowCones,
+  perpendicularBasis,
+} from "./shadow-cone.js";
 import type { SpacefarerFrame } from "./spacefarer-frame.js";
 
 type WorkerResponse =
@@ -66,18 +74,6 @@ function displayDirection(value: CartesianVector): THREE.Vector3 {
   return new THREE.Vector3(value.x, value.z, -value.y).normalize();
 }
 
-function perpendicularBasis(
-  axis: THREE.Vector3,
-): [THREE.Vector3, THREE.Vector3] {
-  const reference =
-    Math.abs(axis.y) < 0.82
-      ? new THREE.Vector3(0, 1, 0)
-      : new THREE.Vector3(1, 0, 0);
-  const first = new THREE.Vector3().crossVectors(axis, reference).normalize();
-  const second = new THREE.Vector3().crossVectors(axis, first).normalize();
-  return [first, second];
-}
-
 function northwardLift(axis: THREE.Vector3): THREE.Vector3 {
   const north = new THREE.Vector3(0, 1, 0);
   const lift = north.addScaledVector(axis, -north.dot(axis));
@@ -85,61 +81,6 @@ function northwardLift(axis: THREE.Vector3): THREE.Vector3 {
     return perpendicularBasis(axis)[0];
   }
   return lift.normalize();
-}
-
-function coneSurface(
-  start: THREE.Vector3,
-  axis: THREE.Vector3,
-  displayLength: number,
-  slope: number,
-  color: number,
-  opacity: number,
-): THREE.Mesh {
-  const radialSegments = 96;
-  const lengthSegments = 48;
-  const [first, second] = perpendicularBasis(axis);
-  const positions: number[] = [];
-  const indices: number[] = [];
-  for (let alongIndex = 0; alongIndex <= lengthSegments; alongIndex += 1) {
-    const along = (displayLength * alongIndex) / lengthSegments;
-    const physicalRadiusKm =
-      MOON_RADIUS_KM + slope * along * EARTH_MEAN_RADIUS_KM;
-    const displayRadius = Math.abs(physicalRadiusKm) / EARTH_MEAN_RADIUS_KM;
-    const centre = start.clone().addScaledVector(axis, along);
-    for (let radialIndex = 0; radialIndex <= radialSegments; radialIndex += 1) {
-      const angle = (radialIndex / radialSegments) * Math.PI * 2;
-      const point = centre
-        .clone()
-        .addScaledVector(first, Math.cos(angle) * displayRadius)
-        .addScaledVector(second, Math.sin(angle) * displayRadius);
-      positions.push(point.x, point.y, point.z);
-    }
-  }
-  const row = radialSegments + 1;
-  for (let alongIndex = 0; alongIndex < lengthSegments; alongIndex += 1) {
-    for (let radialIndex = 0; radialIndex < radialSegments; radialIndex += 1) {
-      const index = alongIndex * row + radialIndex;
-      const next = index + row;
-      indices.push(index, next, index + 1, next, next + 1, index + 1);
-    }
-  }
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute(
-    "position",
-    new THREE.Float32BufferAttribute(positions, 3),
-  );
-  geometry.setIndex(indices);
-  const material = new THREE.MeshBasicMaterial({
-    color,
-    transparent: true,
-    opacity,
-    side: THREE.DoubleSide,
-    depthWrite: false,
-    blending: THREE.AdditiveBlending,
-  });
-  const mesh = new THREE.Mesh(geometry, material);
-  mesh.renderOrder = 3;
-  return mesh;
 }
 
 function disposeLayer(layer: THREE.Group): void {
@@ -179,11 +120,17 @@ function footprint(
 export class TrackerShadowView {
   private readonly renderer: THREE.WebGLRenderer;
   private readonly scene = new THREE.Scene();
-  private readonly camera = new THREE.PerspectiveCamera(42, 1, 0.02, 180);
+  private readonly camera = new THREE.PerspectiveCamera(
+    42,
+    1,
+    0.02,
+    VISIBLE_SUN_FAR,
+  );
   private readonly controls: OrbitControls;
   private readonly cameraPresetButtons: Record<"earth" | "system", HTMLButtonElement>;
   private readonly moon: THREE.Mesh;
   private readonly sunLight = new THREE.DirectionalLight(0xffe6ae, 3.8);
+  private readonly visibleSun = createVisibleSun();
   private readonly coneLayer = new THREE.Group();
   private readonly footprintLayer = new THREE.Group();
   private readonly resizeObserver: ResizeObserver;
@@ -200,6 +147,8 @@ export class TrackerShadowView {
   private firstFrame = true;
   private moonPosition = new THREE.Vector3(-60, 0, 0);
   private shadowAxis = new THREE.Vector3(1, 0, 0);
+  private sunDirection = new THREE.Vector3(-1, 0, 0);
+  private sunAngularRadiusRad = THREE.MathUtils.degToRad(0.266);
   private cameraPreset: "earth" | "system" = "earth";
   private frameStatus = "Preparing the physical shadow view…";
   private followingShadow = true;
@@ -236,6 +185,7 @@ export class TrackerShadowView {
     container.append(this.renderer.domElement, cameraControls);
 
     this.scene.background = new THREE.Color(0x050914);
+    this.scene.add(this.visibleSun.object);
     this.scene.add(new THREE.HemisphereLight(0x7998c2, 0x05050a, 0.48));
     this.sunLight.target.position.set(0, 0, 0);
     this.scene.add(this.sunLight, this.sunLight.target);
@@ -374,22 +324,12 @@ export class TrackerShadowView {
     const coneLength =
       frame.axisDistanceToEarthPlaneKm / EARTH_MEAN_RADIUS_KM + 2.3;
     this.coneLayer.add(
-      coneSurface(
+      ...createEarthClippedShadowCones({
         moonPosition,
-        axis,
-        coneLength,
-        (SUN_RADIUS_KM + MOON_RADIUS_KM) / frame.sunMoonDistanceKm,
-        0xf2b94d,
-        0.09,
-      ),
-      coneSurface(
-        moonPosition,
-        axis,
-        coneLength,
-        -(SUN_RADIUS_KM - MOON_RADIUS_KM) / frame.sunMoonDistanceKm,
-        0x9d7cff,
-        0.23,
-      ),
+        shadowAxis: axis,
+        displayLength: coneLength,
+        sunMoonDistanceKm: frame.sunMoonDistanceKm,
+      }),
     );
     for (const ring of frame.penumbraRings) {
       const line = footprint(ring, 0x7ee7f2);
@@ -399,7 +339,11 @@ export class TrackerShadowView {
       const line = footprint(ring, 0xd1c5ff);
       if (line) this.footprintLayer.add(line);
     }
-    this.sunLight.position.copy(displayDirection(frame.sunEcefKm)).multiplyScalar(20);
+    this.sunDirection.copy(displayDirection(frame.sunEcefKm));
+    this.sunAngularRadiusRad = Math.asin(
+      SUN_RADIUS_KM / frame.sunMoonDistanceKm,
+    );
+    this.sunLight.position.copy(this.sunDirection).multiplyScalar(20);
     this.frameStatus = frame.centralKind !== null
       ? "The narrow purple cone reaches Earth. The wider gold cone marks where a partial eclipse can be seen."
       : frame.penumbraRings.length > 0
@@ -452,7 +396,7 @@ export class TrackerShadowView {
       this.controls.target.set(0, 0, 0);
     }
     this.camera.near = preset === "system" ? 0.05 : 0.02;
-    this.camera.far = 300;
+    this.camera.far = VISIBLE_SUN_FAR;
     this.camera.updateProjectionMatrix();
     this.controls.update();
     this.showCameraStatus();
@@ -477,6 +421,11 @@ export class TrackerShadowView {
   private render = (): void => {
     if (!this.active) return;
     this.controls.update();
+    this.visibleSun.update(
+      this.camera,
+      this.sunDirection,
+      this.sunAngularRadiusRad,
+    );
     this.renderer.render(this.scene, this.camera);
     this.animationFrame = window.requestAnimationFrame(this.render);
   };
