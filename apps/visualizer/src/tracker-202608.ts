@@ -375,6 +375,12 @@ function coordinates(observerValue: Observer): string {
   return `${latitude}° ${northSouth}, ${longitude}° ${eastWest} · ${Math.round(observerValue.elevationMeters ?? 0)} m above sea level`;
 }
 
+function coordinateInputValue(value: number): string {
+  // Five decimal places resolve to roughly one metre of latitude, which is
+  // already finer than a phone location while avoiding raw GPS float noise.
+  return String(Number(value.toFixed(5)));
+}
+
 function compassDirection(degrees: number): string {
   const directions = [
     "north",
@@ -678,9 +684,9 @@ async function setObserver(
           : "Entered location";
   locationCoordinates.textContent = coordinates(nextObserver);
   locationMessage.textContent = "Working out what the eclipse will look like here…";
-  latitudeInput.value = String(nextObserver.latitudeDeg);
-  longitudeInput.value = String(nextObserver.longitudeDeg);
-  elevationInput.value = String(nextObserver.elevationMeters ?? 0);
+  latitudeInput.value = coordinateInputValue(nextObserver.latitudeDeg);
+  longitudeInput.value = coordinateInputValue(nextObserver.longitudeDeg);
+  elevationInput.value = String(Math.round(nextObserver.elevationMeters ?? 0));
   if (source !== "geoip") {
     localStorage.setItem(LOCATION_STORAGE_KEY, JSON.stringify(nextObserver));
   }

@@ -261,6 +261,52 @@ test("does not invent a zero-zero observer when coordinates are absent", async (
   expect(new URL(page.url()).searchParams.has("lat")).toBe(false);
 });
 
+test("prefills manual location with valid, appropriately rounded GPS values", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, "geolocation", {
+      configurable: true,
+      value: {
+        getCurrentPosition(success: PositionCallback) {
+          success({
+            coords: {
+              accuracy: 8,
+              altitude: 42.718281828,
+              altitudeAccuracy: 12,
+              heading: null,
+              latitude: 65.141123456789,
+              longitude: -25.327212345678,
+              speed: null,
+              toJSON() {
+                return this;
+              },
+            },
+            timestamp: Date.now(),
+            toJSON() {
+              return this;
+            },
+          });
+        },
+      },
+    });
+  });
+  await page.goto("/tracker/202608/");
+
+  await page.getByRole("button", { name: "Use my GPS" }).click();
+  await expect(page.locator("#location-label")).toHaveText("Location from GPS");
+  await page.getByRole("button", { name: "Enter a location" }).click();
+
+  await expect(page.locator("#latitude-input")).toHaveValue("65.14112");
+  await expect(page.locator("#longitude-input")).toHaveValue("-25.32721");
+  await expect(page.locator("#elevation-input")).toHaveValue("43");
+  expect(
+    await page.locator("#manual-location").evaluate(
+      (form: HTMLFormElement) => form.checkValidity(),
+    ),
+  ).toBe(true);
+});
+
 test("marks the solar preview when the Sun is below the horizon", async ({
   page,
 }) => {
