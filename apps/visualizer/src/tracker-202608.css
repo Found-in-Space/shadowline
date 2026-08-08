@@ -290,55 +290,21 @@ h2 { margin: 0; font-size: 1.15rem; letter-spacing: -0.025em; }
 
 .solar-disc {
   position: relative;
-  width: 136px;
-  height: 136px;
+  width: 142px;
+  height: 142px;
   overflow: hidden;
-  border-radius: 50%;
-  background: #ffcf68;
-  box-shadow: 0 0 8px #fff4bc, 0 0 26px rgb(255 188 73 / 80%), 0 0 60px rgb(255 166 43 / 34%);
+  border: 1px solid rgb(255 255 255 / 16%);
+  border-radius: 18px;
+  background: #15213d;
+  box-shadow: 0 12px 34px rgb(0 0 0 / 24%), inset 0 0 22px rgb(255 255 255 / 4%);
   isolation: isolate;
 }
 
-.solar-disc::after {
-  position: absolute;
-  inset: 0;
-  border: 1px solid rgb(255 255 255 / 32%);
-  border-radius: inherit;
-  background: radial-gradient(circle at 42% 38%, rgb(255 255 255 / 13%), transparent 55%);
-  content: "";
-}
-
-.moon-disc {
-  position: absolute;
-  z-index: 1;
-  top: 50%;
-  left: 50%;
-  width: 134px;
-  height: 134px;
-  border-radius: 50%;
-  background: #080b12;
-  box-shadow: inset -5px -3px 12px rgb(65 71 89 / 25%);
-  transform: translate(190px, -50%);
-  will-change: transform;
-}
-
-.horizon-mask {
-  position: absolute;
-  z-index: 2;
-  top: 100%;
-  right: -2px;
-  left: -2px;
-  height: calc(100% + 2px);
-  border-top: 2px solid #bfc5cf;
-  background: linear-gradient(180deg, #747b87 0, #424954 70%);
-  box-shadow: 0 -2px 7px rgb(220 225 233 / 28%);
-  pointer-events: none;
-  will-change: top;
-}
+.solar-disc canvas { display: block; width: 100%; height: 100%; }
 
 .horizon-marker {
   position: absolute;
-  z-index: 4;
+  z-index: 2;
   right: 50%;
   bottom: 13px;
   padding: 4px 7px;
@@ -488,7 +454,7 @@ noscript { display: block; padding: 20px; color: var(--danger); text-align: cent
   .connection-state .status-chip:first-child { display: none; }
   .brand strong { font-size: 0.75rem; }
   .disc-card { grid-template-columns: minmax(74px, 1fr) 124px; }
-  .solar-disc { width: 120px; height: 120px; }
+  .solar-disc { width: 120px; height: 120px; border-radius: 15px; }
   .contact-list { margin-top: 8px; }
   .contact-list li { grid-template-columns: minmax(0, 1fr) auto; gap: 12px; }
   .contact-list time { font-size: 0.68rem; }

@@ -16,6 +16,7 @@ import {
   solarDiscGeometry,
   solarHorizonGeometry,
 } from "./tracker-astronomy.js";
+import { SolarPreviewRenderer } from "./tracker-solar-preview.js";
 import { terrainElevationMeters } from "./tracker-terrain.js";
 import { TrackerWorkerClient } from "./tracker-worker-client.js";
 
@@ -73,8 +74,10 @@ const nextEventTime = element("next-event-time");
 const obscurationValue = element("obscuration-value");
 const phaseLabel = element("phase-label");
 const solarDisc = element("solar-disc");
-const moonDisc = element("moon-disc");
-const horizonMask = element("horizon-mask");
+const solarPreview = new SolarPreviewRenderer(
+  solarDisc,
+  element<HTMLCanvasElement>("solar-preview-canvas"),
+);
 const horizonMarker = element("horizon-marker");
 const sunAltitude = element("sun-altitude");
 const sunAzimuth = element("sun-azimuth");
@@ -534,7 +537,7 @@ function renderDisc(atMs: number): void {
   if (!observer) {
     obscurationValue.textContent = "—";
     phaseLabel.textContent = "Choose your location";
-    horizonMask.style.top = "100%";
+    solarPreview.clear();
     horizonMarker.hidden = true;
     solarDisc.classList.remove("is-horizon-crossing", "is-below-horizon");
     delete solarDisc.dataset.horizon;
@@ -546,19 +549,9 @@ function renderDisc(atMs: number): void {
       geometry.sunAltitudeDeg,
       geometry.sunRadiusDeg,
     );
-    const sunRadiusPixels = 66;
-    const x =
-      (geometry.horizontalOffsetDeg / geometry.sunRadiusDeg) * sunRadiusPixels;
-    const y =
-      -(geometry.verticalOffsetDeg / geometry.sunRadiusDeg) * sunRadiusPixels;
-    const moonDiameter =
-      2 * sunRadiusPixels * (geometry.moonRadiusDeg / geometry.sunRadiusDeg);
-    moonDisc.style.width = `${moonDiameter}px`;
-    moonDisc.style.height = `${moonDiameter}px`;
-    moonDisc.style.transform = `translate(calc(-50% + ${x.toFixed(2)}px), calc(-50% + ${y.toFixed(2)}px))`;
+    solarPreview.render(geometry, horizon);
     obscurationValue.textContent = `${(geometry.obscuration * 100).toFixed(1)}% covered`;
     phaseLabel.textContent = currentPhase(atMs);
-    horizonMask.style.top = `${horizon.edgePositionPercent.toFixed(2)}%`;
     solarDisc.classList.toggle("is-horizon-crossing", horizon.state === "crossing");
     solarDisc.classList.toggle("is-below-horizon", horizon.state === "below");
     solarDisc.dataset.horizon = horizon.state;

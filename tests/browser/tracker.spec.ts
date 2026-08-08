@@ -273,7 +273,18 @@ test("marks the solar preview when the Sun is below the horizon", async ({
     "below",
   );
   await expect(page.locator("#solar-disc")).toHaveClass(/is-below-horizon/);
-  await expect(page.locator("#horizon-mask")).toHaveCSS("top", "0px");
+  await expect(page.locator("#solar-preview-canvas")).toHaveAttribute(
+    "data-renderer-ready",
+    "true",
+  );
+  await expect(page.locator("#solar-disc")).toHaveAttribute(
+    "data-direct-sun-visible",
+    "false",
+  );
+  await expect(page.locator("#solar-disc")).toHaveAttribute(
+    "data-horizon-edge",
+    "0.00",
+  );
   await expect(page.locator("#horizon-marker")).toBeVisible();
   await expect(page.locator("#horizon-marker")).toHaveText("Below horizon");
   await expect(page.locator("#solar-disc")).toHaveAttribute(
@@ -297,11 +308,15 @@ test("moves the horizon edge across the solar preview at sunset", async ({
   await expect(page.locator("#horizon-marker")).toHaveText(
     "Partly below horizon",
   );
-  const edgePosition = await page.locator("#horizon-mask").evaluate((mask) =>
-    Number.parseFloat(getComputedStyle(mask).top),
+  const edgePosition = Number(
+    await page.locator("#solar-disc").getAttribute("data-horizon-edge"),
   );
-  expect(edgePosition).toBeGreaterThan(60);
-  expect(edgePosition).toBeLessThan(120);
+  expect(edgePosition).toBeGreaterThan(0);
+  expect(edgePosition).toBeLessThan(100);
+  await expect(page.locator("#solar-disc")).toHaveAttribute(
+    "data-atmospheric-glow",
+    "visible",
+  );
   await expect(page.locator("#solar-disc")).toHaveAttribute(
     "aria-label",
     /The horizon crosses the solar disc/,
