@@ -23,7 +23,7 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run check
-      - run: npm run release:status
+      - run: npm run release:status -- --since=origin/main
       - run: npm test
       - run: npm run build
       - run: npm run release:check-packed-consumers

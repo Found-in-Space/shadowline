@@ -25,8 +25,11 @@ test("provides a mobile local eclipse field view and manual preview", async ({
   await expect(page).toHaveTitle(/Found in Space/);
   await expect(page.getByText("Eclipse tracker", { exact: true })).toBeVisible();
   await expect(
-    page.getByText("What this prediction can—and can’t—show", { exact: true }),
+    page.getByText("About these eclipse predictions", { exact: true }),
   ).toBeVisible();
+  await expect(page.locator("#network-status")).toHaveCount(0);
+  await expect(page.locator("#clock-status")).toHaveCount(0);
+  await expect(page.locator("#offline-status")).toHaveCount(0);
   await expect(page.locator('a[href="https://www.k-si.com/"]')).toHaveText(
     "Kaj Siebert",
   );
@@ -175,19 +178,24 @@ test("provides a mobile local eclipse field view and manual preview", async ({
     "true",
   );
 
+  await page.getByRole("tab", { name: "Ground" }).click();
+  await expect(page.locator("#tracker-ground canvas")).toHaveCount(1);
+  await expect(page.locator("body")).not.toContainText("terrain tiles");
+  await expect(page.locator("body")).not.toContainText("tile providers");
+  await expect(page.locator("body")).not.toContainText("rendered once");
+
   await page.getByRole("tab", { name: "Globe" }).click();
   await expect(page.locator("#tracker-globe")).toBeVisible();
 
-  await expect(page.locator("#offline-status")).toContainText(
-    /ready for a poor connection/i,
-  );
+  await page.evaluate(async () => {
+    await navigator.serviceWorker.ready;
+  });
   await context.setOffline(true);
   await page.reload({ waitUntil: "domcontentloaded" });
   await expect(
     page.getByRole("heading", { name: "12 August 2026" }),
   ).toBeVisible();
   await expect(page.getByText("You can see totality from this location.")).toBeVisible();
-  await expect(page.locator("#clock-status")).toHaveText("Time checked earlier");
   await page.getByRole("tab", { name: "Map" }).click();
   await expect(page.locator("#tracker-map")).toHaveAttribute(
     "data-renderer-ready",
@@ -244,8 +252,11 @@ test("refines a missing observer elevation without blocking contacts", async ({
   const page = await context.newPage();
   await page.goto("/tracker/202608/?lat=65.1411&lon=-25.3272");
 
-  await expect(page.locator("#location-message")).toContainText(
-    "The terrain map puts this location about 2 m above sea level.",
+  await expect(page.locator("#location-coordinates")).toContainText(
+    "2 m above sea level",
+  );
+  await expect(page.locator("#location-message")).toHaveText(
+    "You can see totality from this location.",
   );
   await expect(page.locator("#contact-list li")).toHaveCount(5);
   await context.close();
@@ -333,6 +344,7 @@ test("marks the solar preview when the Sun is below the horizon", async ({
   );
   await expect(page.locator("#horizon-marker")).toBeVisible();
   await expect(page.locator("#horizon-marker")).toHaveText("Below horizon");
+  await expect(page.locator("#sun-altitude")).toContainText("below the horizon");
   await expect(page.locator("#solar-disc")).toHaveAttribute(
     "aria-label",
     /degrees below the horizon/,

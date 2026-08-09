@@ -150,7 +150,7 @@ export class TrackerShadowView {
   private sunDirection = new THREE.Vector3(-1, 0, 0);
   private sunAngularRadiusRad = THREE.MathUtils.degToRad(0.266);
   private cameraPreset: "earth" | "system" = "earth";
-  private frameStatus = "Preparing the physical shadow view…";
+  private frameStatus = "";
   private followingShadow = true;
   private controlGestureActive = false;
 
@@ -252,7 +252,7 @@ export class TrackerShadowView {
       this.handleWorkerMessage(message.data);
     });
     this.worker.addEventListener("error", () => {
-      this.options.onStatus?.("The physical shadow view could not start.");
+      this.options.onStatus?.("The shadow view is unavailable.");
     });
     container.dataset.rendererReady = "true";
     container.dataset.followingShadow = "true";
@@ -306,7 +306,7 @@ export class TrackerShadowView {
     if (response.type !== "frame" && response.type !== "error") return;
     this.requestInFlight = false;
     if (response.type === "error") {
-      this.options.onStatus?.("The physical shadow could not be calculated for this time.");
+      this.options.onStatus?.("The eclipse shadow is not reaching Earth at this time.");
     } else {
       this.updateFrame(response.frame);
     }

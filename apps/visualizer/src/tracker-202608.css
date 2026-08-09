@@ -101,9 +101,6 @@ button { touch-action: manipulation; }
 .brand small { color: var(--violet); font-size: 0.58rem; font-weight: 850; letter-spacing: 0.13em; text-transform: uppercase; }
 .brand strong { font-size: 0.83rem; letter-spacing: -0.015em; }
 
-.connection-state { display: flex; justify-content: flex-end; gap: 5px; }
-
-.status-chip,
 .mode-badge {
   display: inline-flex;
   align-items: center;
@@ -119,9 +116,6 @@ button { touch-action: manipulation; }
   white-space: nowrap;
 }
 
-.status-chip.is-ready { color: #bdf7ed; border-color: rgb(99 214 200 / 32%); }
-.status-chip.is-offline { color: #ffd0cd; border-color: rgb(255 141 134 / 35%); }
-
 .tracker-shell {
   display: grid;
   gap: 14px;
@@ -132,7 +126,6 @@ button { touch-action: manipulation; }
 
 .live-panel,
 .globe-card,
-.field-note,
 .accuracy-note {
   border: 1px solid var(--line);
   border-radius: 18px;
@@ -426,22 +419,18 @@ h2 { margin: 0; font-size: 1.15rem; letter-spacing: -0.025em; }
   backdrop-filter: blur(10px);
 }
 .shadow-camera-controls button[aria-pressed="true"] { color: #25122d; border-color: transparent; background: var(--violet); }
-.overview-placeholder { position: absolute; inset: 0; display: grid; place-items: center; margin: 0; padding: 30px; color: var(--muted); text-align: center; }
 .tracker-globe .maplibregl-ctrl-attrib { font-size: 9px; }
 .tracker-globe .renderer-error { display: grid; place-items: center; height: 100%; padding: 30px; color: var(--muted); text-align: center; }
 .tracker-map .leaflet-control-attribution { font-size: 9px; }
-.globe-status { min-height: 34px; margin: 0; padding: 9px 14px; color: var(--muted); border-top: 1px solid var(--line); font-size: 0.66rem; line-height: 1.4; }
+.overview-caption { margin: 0; padding: 9px 14px; color: var(--muted); border-top: 1px solid var(--line); font-size: 0.66rem; line-height: 1.4; }
+.overview-caption[hidden] { display: none; }
 
-.field-note,
 .accuracy-note { padding: 17px 15px; }
-.field-note p:not(.eyebrow),
 .accuracy-note p { color: var(--muted); font-size: 0.73rem; line-height: 1.55; }
-.field-note #offline-status { color: #bdf7ed; font-weight: 750; }
-.field-note .project-credit { margin-bottom: 0; padding-top: 10px; border-top: 1px solid var(--line); }
-.field-note .project-credit a { color: var(--gold); }
 .accuracy-note summary { cursor: pointer; font-size: 0.84rem; font-weight: 850; }
-.accuracy-note a { color: var(--gold); }
 .accuracy-note p:last-child { margin-bottom: 0; }
+.project-credit { margin: 0; padding: 0 4px; color: var(--muted); font-size: 0.68rem; line-height: 1.5; }
+.project-credit a { color: var(--gold); }
 
 noscript { display: block; padding: 20px; color: var(--danger); text-align: center; }
 
@@ -467,7 +456,6 @@ noscript { display: block; padding: 20px; color: var(--danger); text-align: cent
 }
 
 @media (max-width: 420px) {
-  .connection-state .status-chip:first-child { display: none; }
   .brand strong { font-size: 0.75rem; }
   .disc-card { grid-template-columns: minmax(74px, 1fr) 124px; }
   .solar-disc { width: 120px; height: 120px; border-radius: 15px; }
