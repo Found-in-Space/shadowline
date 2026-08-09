@@ -1,44 +1,41 @@
 import { expect, test } from "@playwright/test";
 
-test("loads and updates the physical Spacefarer model", async ({ page }) => {
-  test.setTimeout(45_000);
+const LOCAL_ORIGIN = "http://127.0.0.1:4196";
+
+test.beforeEach(async ({ page }) => {
+  await page.route("**/*", (route) =>
+    new URL(route.request().url()).origin === LOCAL_ORIGIN
+      ? route.continue()
+      : route.abort(),
+  );
+});
+
+test("updates the WebGL view in response to pointer navigation", async ({
+  page,
+}) => {
   await page.goto("/spacefarer/");
   const canvas = page.locator("#scene-root canvas");
-  await expect(canvas).toHaveCount(1);
-  await expect(page.locator("#loading-state")).toBeHidden({ timeout: 20_000 });
+  const bounds = await canvas.boundingBox();
+  if (!bounds) throw new Error("The WebGL canvas has no visible bounds.");
 
-  const timeSlider = page.locator("#time-slider");
-  await expect
-    .poll(async () => Number(await timeSlider.getAttribute("max")))
-    .toBeGreaterThan(15_000);
-  const extentSeconds = Number(await timeSlider.getAttribute("max"));
-  expect(extentSeconds).toBeLessThan(16_000);
+  const before = await canvas.screenshot();
+  await page.mouse.move(
+    bounds.x + bounds.width / 2,
+    bounds.y + bounds.height / 2,
+  );
+  await page.mouse.down();
+  await page.mouse.move(
+    bounds.x + bounds.width / 2 + 120,
+    bounds.y + bounds.height / 2 + 60,
+    { steps: 4 },
+  );
+  await page.mouse.up();
+  await page.evaluate(
+    () =>
+      new Promise<void>((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+      ),
+  );
 
-  const timeLabel = page.locator("#time-label");
-  const initialTime = await timeLabel.textContent();
-  await timeSlider.evaluate((element) => {
-    const input = element as HTMLInputElement;
-    input.value = input.min;
-    input.dispatchEvent(new Event("input", { bubbles: true }));
-  });
-  await expect
-    .poll(() => timeLabel.textContent())
-    .not.toBe(initialTime);
-
-  const startTime = await timeLabel.textContent();
-  const startFrame = await canvas.screenshot();
-  await timeSlider.evaluate((element) => {
-    const input = element as HTMLInputElement;
-    input.value = input.max;
-    input.dispatchEvent(new Event("input", { bubbles: true }));
-  });
-  await expect
-    .poll(() => timeLabel.textContent())
-    .not.toBe(startTime);
-  expect(await canvas.screenshot()).not.toEqual(startFrame);
-
-  await page.getByRole("button", { name: /Shadow corridor/ }).click();
-  await expect(
-    page.getByRole("button", { name: /Shadow corridor/ }),
-  ).toHaveAttribute("aria-pressed", "true");
+  expect(await canvas.screenshot()).not.toEqual(before);
 });

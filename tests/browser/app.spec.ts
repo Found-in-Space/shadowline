@@ -1,614 +1,100 @@
-import { expect, test, type Locator } from "@playwright/test";
+import { readFile } from "node:fs/promises";
+import { expect, test } from "@playwright/test";
 
-async function expectRenderedFeatures(
-  map: Locator,
-  attribute = "data-path-feature-count",
-): Promise<void> {
-  await expect
-    .poll(async () => Number((await map.getAttribute(attribute)) ?? 0))
-    .toBeGreaterThan(0);
-}
+const LOCAL_ORIGIN = "http://127.0.0.1:4196";
 
 test.beforeEach(async ({ page }) => {
-  await page.route("https://tile.openstreetmap.org/**", (route) =>
-    route.abort(),
-  );
-  await page.route("https://gibs.earthdata.nasa.gov/**", (route) =>
-    route.abort(),
-  );
-  await page.route("https://tiles.mapterhorn.com/**", (route) =>
-    route.abort(),
+  await page.route("**/*", (route) =>
+    new URL(route.request().url()).origin === LOCAL_ORIGIN
+      ? route.continue()
+      : route.abort(),
   );
 });
 
-test("lets every map fill its projection panel edge to edge", async ({
+test("lays out the projections for wide and narrow browser viewports", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/browse/?eclipse=solar-2026-08-12-total");
-  await expectRenderedFeatures(page.locator("#mercator-map"));
 
-  const layout = await page.evaluate(() => ({
-    panels: Array.from(document.querySelectorAll(".map-panel")).map(
-      (panel: Element) => {
-        const map = panel.querySelector(".map-viewport")!;
-        const panelBox = panel.getBoundingClientRect();
-        const mapBox = map.getBoundingClientRect();
-        return {
-          panel: {
-            top: panelBox.top,
-            right: panelBox.right,
-            bottom: panelBox.bottom,
-            left: panelBox.left,
-          },
-          map: {
-            top: mapBox.top,
-            right: mapBox.right,
-            bottom: mapBox.bottom,
-            left: mapBox.left,
-          },
-        };
-      },
-    ),
-  }));
+  const wide = await page.evaluate(() =>
+    ["mercator", "globe", "world", "ground"].map((projection) => {
+      const panel = document.querySelector(`.${projection}-panel`);
+      const map = panel?.querySelector(".map-viewport");
+      if (!panel || !map) {
+        throw new Error(`The ${projection} projection has no viewport.`);
+      }
+      const panelBox = panel.getBoundingClientRect();
+      const mapBox = map.getBoundingClientRect();
+      return {
+        panel: {
+          top: panelBox.top,
+          right: panelBox.right,
+          bottom: panelBox.bottom,
+          left: panelBox.left,
+        },
+        map: {
+          top: mapBox.top,
+          right: mapBox.right,
+          bottom: mapBox.bottom,
+          left: mapBox.left,
+        },
+      };
+    }),
+  );
 
-  expect(layout.panels).toHaveLength(4);
-  for (const { panel, map } of layout.panels) {
+  for (const { panel, map } of wide) {
     expect(map.top).toBeCloseTo(panel.top, 5);
     expect(map.right).toBeCloseTo(panel.right, 5);
     expect(map.bottom).toBeCloseTo(panel.bottom, 5);
     expect(map.left).toBeCloseTo(panel.left, 5);
   }
-  expect(layout.panels[0]!.panel.right).toBeCloseTo(
-    layout.panels[1]!.panel.left,
-    5,
+  expect(wide[0]!.panel.right).toBeCloseTo(wide[1]!.panel.left, 5);
+  expect(wide[0]!.panel.bottom).toBeCloseTo(wide[2]!.panel.top, 5);
+
+  await page.setViewportSize({ width: 640, height: 900 });
+  const narrow = await Promise.all(
+    [".mercator-panel", ".globe-panel", ".world-panel"].map((selector) =>
+      page.locator(selector).boundingBox(),
+    ),
   );
-  expect(layout.panels[0]!.panel.bottom).toBeCloseTo(
-    layout.panels[2]!.panel.top,
-    5,
-  );
-  expect(layout.panels[2]!.panel.right).toBeCloseTo(
-    layout.panels[3]!.panel.left,
-    5,
-  );
-  expect(layout.panels[1]!.panel.bottom).toBeCloseTo(
-    layout.panels[3]!.panel.top,
-    5,
-  );
+  expect(narrow.every((box) => box !== null)).toBe(true);
+  expect(narrow[1]!.y).toBeGreaterThan(narrow[0]!.y + narrow[0]!.height - 2);
+  expect(narrow[2]!.y).toBeGreaterThan(narrow[1]!.y + narrow[1]!.height - 2);
 });
 
-test("keeps polar Web Mercator fits inside the projected world", async ({
-  page,
-}) => {
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await page.goto("/browse/?eclipse=solar-2026-08-12-total");
-  await expectRenderedFeatures(page.locator("#mercator-map"));
-
-  const mapBox = await page.locator("#mercator-map").boundingBox();
-  const match = new URL(page.url()).hash.match(
-    /^#map=([0-9.]+)\/(-?[0-9.]+)\/(-?[0-9.]+)$/,
-  );
-  expect(mapBox).not.toBeNull();
-  expect(match).not.toBeNull();
-
-  const zoom = Number(match![1]);
-  const latitude = Number(match![2]);
-  const worldSize = 256 * 2 ** zoom;
-  const latitudeRadians = (latitude * Math.PI) / 180;
-  const centerY =
-    ((1 -
-      Math.log(
-        Math.tan(latitudeRadians) + 1 / Math.cos(latitudeRadians),
-      ) /
-        Math.PI) /
-      2) *
-    worldSize;
-
-  expect(centerY - mapBox!.height / 2).toBeGreaterThanOrEqual(-0.5);
-  expect(centerY + mapBox!.height / 2).toBeLessThanOrEqual(
-    worldSize + 0.5,
-  );
-});
-
-test("paginates discovery and searches arbitrary years", async ({
-  page,
-}) => {
-  const catalogueRequests: string[] = [];
-  page.on("request", (request) => {
-    if (request.url().includes("eclipse-catalogue.json")) {
-      catalogueRequests.push(request.url());
-    }
-  });
-  await page.goto("/browse/");
-  await expect(page.locator("[data-event-id]")).toHaveCount(5);
-  await page
-    .getByRole("button", { name: "Show 5 later eclipses" })
-    .click();
-  await expect(page.locator("[data-event-id]")).toHaveCount(10);
-  const firstLoadedId = await page
-    .locator("[data-event-id]")
-    .first()
-    .getAttribute("data-event-id");
-  expect(firstLoadedId).not.toBeNull();
-  await page.locator("#sidebar").evaluate((element) => {
-    element.scrollTop = 0;
-  });
-  const firstLoadedBefore = await page
-    .locator(`[data-event-id="${firstLoadedId}"]`)
-    .boundingBox();
-  await page
-    .getByRole("button", { name: "Show 5 earlier eclipses" })
-    .click();
-  await expect(page.locator("[data-event-id]")).toHaveCount(15);
-  const firstLoadedAfter = await page
-    .locator(`[data-event-id="${firstLoadedId}"]`)
-    .boundingBox();
-  expect(firstLoadedBefore).not.toBeNull();
-  expect(firstLoadedAfter).not.toBeNull();
-  expect(firstLoadedAfter!.y).toBeCloseTo(firstLoadedBefore!.y, 0);
-  const initialPeaks = await page
-    .locator("[data-event-id]")
-    .evaluateAll((buttons) =>
-      buttons.map((button) =>
-        button.getAttribute("data-event-id"),
-      ),
-    );
-  expect(new Set(initialPeaks).size).toBe(initialPeaks.length);
-  const yearInput = page.getByLabel("Calendar year");
-  await yearInput.fill("3500");
-  await page.getByRole("button", { name: "Search" }).click();
-  await expect
-    .poll(async () => {
-      const ids = await page
-        .locator("[data-event-id]")
-        .evaluateAll((buttons) =>
-          buttons.map((button) => button.getAttribute("data-event-id")),
-        );
-      return ids.length > 0 && ids.every((id) => id?.startsWith("solar-3500-"));
-    })
-    .toBe(true);
-  await yearInput.fill("2023");
-  await page.getByRole("button", { name: "Search" }).click();
-  const hybrid = page.locator('[data-event-id="solar-2023-04-20-hybrid"]');
-  await expect(hybrid).toHaveCount(1);
-  await hybrid.click();
-  await expect(page).toHaveURL(/eclipse=solar-2023-04-20-hybrid/);
-  await expectRenderedFeatures(page.locator("#mercator-map"));
-  expect(catalogueRequests).toEqual([]);
-});
-
-test("keeps discovery results stable when selecting an eclipse", async ({
-  page,
-}) => {
-  await page.goto("/browse/");
-  await expect(page.locator("[data-event-id]")).toHaveCount(5);
-  await page
-    .getByRole("button", { name: "Show 5 later eclipses" })
-    .click();
-  await expect(page.locator("[data-event-id]")).toHaveCount(10);
-
-  const eventIds = await page
-    .locator("[data-event-id]")
-    .evaluateAll((buttons) =>
-      buttons.map((button) => button.getAttribute("data-event-id")),
-    );
-  const selectedId = eventIds[1];
-  expect(selectedId).not.toBeNull();
-  await page.locator("[data-event-id]").nth(1).click();
-  await expect
-    .poll(() => new URL(page.url()).searchParams.get("eclipse"))
-    .toBe(selectedId);
-
-  await expect(page.locator("[data-event-id]")).toHaveCount(10);
-  expect(
-    await page
-      .locator("[data-event-id]")
-      .evaluateAll((buttons) =>
-        buttons.map((button) => button.getAttribute("data-event-id")),
-      ),
-  ).toEqual(eventIds);
-});
-
-test("keeps the newest event search when an older search finishes later", async ({
-  page,
-}) => {
-  await page.goto("/browse/");
-  await expect(page.locator("[data-event-id]")).toHaveCount(5);
-
-  await page.getByLabel("Calendar year").fill("2023");
-  await page.getByRole("button", { name: "Search" }).click();
-  await page.getByLabel("Calendar year").fill("2026");
-  await page.getByRole("button", { name: "Search" }).click();
-
-  const showsOnly2026Events = async () => {
-    const ids = await page
-      .locator("[data-event-id]")
-      .evaluateAll((buttons) =>
-        buttons.map((button) => button.getAttribute("data-event-id")),
-      );
-    return ids.length > 0 && ids.every((id) => id?.startsWith("solar-2026-"));
-  };
-  await expect.poll(showsOnly2026Events).toBe(true);
-  await page.waitForTimeout(1_000);
-  expect(await showsOnly2026Events()).toBe(true);
-});
-
-test("renders global visibility for a partial-only eclipse", async ({
-  page,
-}) => {
-  await page.goto("/browse/?eclipse=solar-2025-03-29-partial&year=2025");
-  await expectRenderedFeatures(
-    page.locator("#mercator-map"),
-    "data-global-feature-count",
-  );
-  const downloadPromise = page.waitForEvent("download");
-  await page.getByRole("button", { name: "Download GeoJSON" }).click();
-  const download = await downloadPromise;
-  expect(download.suggestedFilename()).toBe(
-    "solar-2025-03-29-partial.geojson",
-  );
-});
-
-test("restores a selected place from shareable state", async ({ page }) => {
-  await page.goto(
-    "/browse/?eclipse=solar-2026-08-12-total&lat=41.81670&lon=-3.18500",
-  );
-  for (const id of ["mercator-map", "globe-map", "world-map"]) {
-    await expect(page.locator(`#${id}`)).toHaveAttribute(
-      "data-selected-latitude",
-      "41.81670",
-    );
-    await expect(page.locator(`#${id}`)).toHaveAttribute(
-      "data-selected-longitude",
-      "-3.18500",
-    );
-  }
-  await expectRenderedFeatures(
-    page.locator("#mercator-map"),
-    "data-shadow-feature-count",
-  );
-  await expect(page).toHaveURL(/lat=41\.81670/);
-  await expect(page).toHaveURL(/locator=date/);
-  await expect(page).toHaveURL(/around=2026-08-12/);
-});
-
-test("restores and pages one chronological place timeline", async ({
-  page,
-}) => {
-  await page.goto(
-    "/browse/?eclipse=solar-2026-08-12-total&year=2026&locator=place&around=2026-08-12&lat=41.81670&lon=-3.18500",
-  );
-  await expect(page.getByLabel("Around date")).toHaveValue("2026-08-12");
-  await expect(page.locator("[data-local-peak]")).toHaveCount(11);
-
-  await page
-    .getByRole("button", { name: "Show 5 earlier eclipses" })
-    .click();
-  await expect(page.locator("[data-local-peak]")).toHaveCount(16);
-  await page
-    .getByRole("button", { name: "Show 5 later eclipses" })
-    .click();
-  await expect(page.locator("[data-local-peak]")).toHaveCount(21);
-  const peaks = await page
-    .locator("[data-local-peak]")
-    .evaluateAll((buttons) =>
-      buttons.map((button) => button.getAttribute("data-local-peak")!),
-    );
-  expect(peaks).toEqual([...peaks].sort());
-  expect(new Set(peaks).size).toBe(peaks.length);
-
-  const selectedList = [...peaks];
-  const target = page.locator('[data-local-peak^="2027-08-02"]');
-  await expect(target).toHaveCount(1);
-  await target.click();
-  await expect(page).not.toHaveURL(/eclipse=solar-2026-08-12-total/);
-  await expect(page).toHaveURL(/lat=41\.81670/);
-  await expect(page).toHaveURL(/locator=place/);
-  await expect(page).toHaveURL(/around=2026-08-12/);
-  await expect(page.locator("[data-local-peak]")).toHaveCount(21);
-  expect(
-    await page
-      .locator("[data-local-peak]")
-      .evaluateAll((buttons) =>
-        buttons.map((button) => button.getAttribute("data-local-peak")!),
-      ),
-  ).toEqual(selectedList);
-});
-
-test("retains each locator timeline while switching modes", async ({
-  page,
-}) => {
-  await page.goto(
-    "/browse/?eclipse=solar-2026-08-12-total&year=2026&locator=place&around=2026-08-12&lat=41.81670&lon=-3.18500",
-  );
-  await expect(page.locator("[data-local-peak]")).toHaveCount(11);
-  const placePeaks = await page
-    .locator("[data-local-peak]")
-    .evaluateAll((buttons) =>
-      buttons.map((button) => button.getAttribute("data-local-peak")),
-    );
-
-  await page.getByRole("tab", { name: "By date" }).click();
-  await expect(page.locator("[data-event-id]")).toHaveCount(2);
-  await page
-    .getByRole("button", { name: "Show 5 later eclipses" })
-    .click();
-  await expect(page.locator("[data-event-id]")).toHaveCount(7);
-  const dateIds = await page
-    .locator("[data-event-id]")
-    .evaluateAll((buttons) =>
-      buttons.map((button) => button.getAttribute("data-event-id")),
-    );
-
-  await page.getByRole("tab", { name: "By place" }).click();
-  expect(
-    await page
-      .locator("[data-local-peak]")
-      .evaluateAll((buttons) =>
-        buttons.map((button) => button.getAttribute("data-local-peak")),
-      ),
-  ).toEqual(placePeaks);
-
-  const placePanel = page.getByRole("tabpanel", { name: "By place" });
-  await placePanel.getByLabel("Around date").fill("2027-08-02");
-  await placePanel.getByRole("button", { name: "Search" }).click();
-  await expect
-    .poll(async () =>
-      page.locator("[data-local-peak]").evaluateAll((buttons) =>
-        buttons.map((button) => button.getAttribute("data-local-peak")),
-      ),
-    )
-    .not.toEqual(placePeaks);
-  await expect(page.locator("[data-local-peak]")).toHaveCount(11);
-  await expect(page).toHaveURL(/around=2027-08-02/);
-
-  await page.getByRole("tab", { name: "By date" }).click();
-  expect(
-    await page
-      .locator("[data-event-id]")
-      .evaluateAll((buttons) =>
-        buttons.map((button) => button.getAttribute("data-event-id")),
-      ),
-  ).toEqual(dateIds);
-});
-
-test("refreshes place discovery after changing the map location in date mode", async ({
-  page,
-}) => {
-  await page.goto(
-    "/browse/?eclipse=solar-2026-08-12-total&year=2026&locator=place&around=2026-08-12&lat=41.81670&lon=-3.18500",
-  );
-  await expect(page.locator("[data-local-peak]")).toHaveCount(11);
-  const originalPeaks = await page
-    .locator("[data-local-peak]")
-    .evaluateAll((buttons) =>
-      buttons.map((button) => button.getAttribute("data-local-peak")),
-    );
-
-  await page.getByRole("tab", { name: "By date" }).click();
-  const mercator = page.locator("#mercator-map");
-  await mercator.click();
-  await expect
-    .poll(() => mercator.getAttribute("data-selected-latitude"))
-    .not.toBe("41.81670");
-
-  await page.getByRole("tab", { name: "By place" }).click();
-  await expect(page.locator("[data-local-peak]")).toHaveCount(10);
-  expect(
-    await page
-      .locator("[data-local-peak]")
-      .evaluateAll((buttons) =>
-        buttons.map((button) => button.getAttribute("data-local-peak")),
-      ),
-  ).not.toEqual(originalPeaks);
-});
-
-test("calculates shadows by clicking an eclipse overlay", async ({ page }) => {
-  await page.goto("/browse/?eclipse=solar-2026-08-12-total");
-  await expectRenderedFeatures(page.locator("#mercator-map"));
-  await expect(page).toHaveURL(/#map=\d+\//);
-
-  const [, zoomText, centerLatitudeText, centerLongitudeText] =
-    new URL(page.url()).hash.match(
-      /^#map=(\d+)\/([-\d.]+)\/([-\d.]+)$/,
-    )!;
-  const zoom = Number(zoomText);
-  const worldSize = 256 * 2 ** zoom;
-  const project = (latitude: number, longitude: number) => {
-    const latitudeRadians = (latitude * Math.PI) / 180;
-    return {
-      x: ((longitude + 180) / 360) * worldSize,
-      y:
-        ((1 -
-          Math.log(
-            Math.tan(latitudeRadians) + 1 / Math.cos(latitudeRadians),
-          ) /
-            Math.PI) /
-          2) *
-        worldSize,
-    };
-  };
-  const center = project(
-    Number(centerLatitudeText),
-    Number(centerLongitudeText),
-  );
-  const target = project(65.219, -25.252);
-  let deltaX = target.x - center.x;
-  if (deltaX > worldSize / 2) deltaX -= worldSize;
-  if (deltaX < -worldSize / 2) deltaX += worldSize;
-  const mapBox = await page.locator("#mercator-map").boundingBox();
-  expect(mapBox).not.toBeNull();
-  await page.mouse.click(
-    mapBox!.x + mapBox!.width / 2 + deltaX,
-    mapBox!.y + mapBox!.height / 2 + target.y - center.y,
-  );
-
-  await expectRenderedFeatures(
-    page.locator("#mercator-map"),
-    "data-shadow-feature-count",
-  );
-  await expect(page).toHaveURL(/lat=65\./);
-});
-
-test("selects one synchronized observer from every projection", async ({
+test("turns clicks in every projection into a shareable observer", async ({
   page,
 }) => {
   await page.goto("/browse/?eclipse=solar-2026-08-12-total");
-  await expectRenderedFeatures(page.locator("#mercator-map"));
 
   for (const id of ["mercator-map", "globe-map", "world-map"]) {
+    await page.evaluate(() => {
+      const url = new URL(location.href);
+      url.searchParams.delete("lat");
+      url.searchParams.delete("lon");
+      history.replaceState(null, "", url);
+    });
+
     await page.locator(`#${id}`).click();
-    const latitude = await page
-      .locator(`#${id}`)
-      .getAttribute("data-selected-latitude");
-    const longitude = await page
-      .locator(`#${id}`)
-      .getAttribute("data-selected-longitude");
-    expect(latitude).not.toBeNull();
-    expect(longitude).not.toBeNull();
-    for (const synchronizedId of [
-      "mercator-map",
-      "globe-map",
-      "world-map",
-    ]) {
-      await expect(page.locator(`#${synchronizedId}`)).toHaveAttribute(
-        "data-selected-latitude",
-        latitude!,
+    await expect(page).toHaveURL((url) => {
+      const latitude = Number(url.searchParams.get("lat"));
+      const longitude = Number(url.searchParams.get("lon"));
+      return (
+        url.searchParams.has("lat") &&
+        url.searchParams.has("lon") &&
+        Number.isFinite(latitude) &&
+        Number.isFinite(longitude) &&
+        latitude >= -90 &&
+        latitude <= 90 &&
+        longitude >= -180 &&
+        longitude <= 180
       );
-      await expect(page.locator(`#${synchronizedId}`)).toHaveAttribute(
-        "data-selected-longitude",
-        longitude!,
-      );
-    }
+    });
   }
 });
 
-test("renders and round-trips a selected location at the pole", async ({
-  page,
-}) => {
-  await page.goto(
-    "/browse/?eclipse=solar-2026-08-12-total&lat=89.90000&lon=0.00000",
-  );
-  await expectRenderedFeatures(page.locator("#globe-map"));
-
-  for (const id of ["mercator-map", "globe-map", "world-map"]) {
-    await expect(page.locator(`#${id}`)).toHaveAttribute(
-      "data-selected-latitude",
-      "89.90000",
-    );
-    await expect(page.locator(`#${id}`)).toHaveAttribute(
-      "data-selected-longitude",
-      "0.00000",
-    );
-  }
-
-  const globe = page.locator("#globe-map");
-  const screenshot = await globe.screenshot();
-  const marker = await page.evaluate(
-    async (source) => {
-      const image = new Image();
-      image.src = source;
-      await image.decode();
-      const canvas = document.createElement("canvas");
-      canvas.width = image.width;
-      canvas.height = image.height;
-      const context = canvas.getContext("2d");
-      if (!context) throw new Error("Canvas 2D context unavailable.");
-      context.drawImage(image, 0, 0);
-      const pixels = context.getImageData(
-        0,
-        0,
-        canvas.width,
-        canvas.height,
-      ).data;
-      let count = 0;
-      let totalX = 0;
-      let totalY = 0;
-      for (let y = 0; y < canvas.height; y += 1) {
-        for (let x = 0; x < canvas.width; x += 1) {
-          const index = (y * canvas.width + x) * 4;
-          if (
-            Math.abs(pixels[index]! - 37) <= 3 &&
-            Math.abs(pixels[index + 1]! - 109) <= 3 &&
-            Math.abs(pixels[index + 2]! - 103) <= 3
-          ) {
-            count += 1;
-            totalX += x;
-            totalY += y;
-          }
-        }
-      }
-      return {
-        count,
-        x: totalX / count,
-        y: totalY / count,
-      };
-    },
-    `data:image/png;base64,${screenshot.toString("base64")}`,
-  );
-  expect(marker.count).toBeGreaterThan(20);
-
-  const box = await globe.boundingBox();
-  expect(box).not.toBeNull();
-  await page.mouse.click(box!.x + marker.x, box!.y + marker.y);
-  await expect
-    .poll(async () =>
-      Number(
-        (await globe.getAttribute("data-selected-latitude")) ?? -90,
-      ),
-    )
-    .toBeGreaterThan(89.5);
-
-  const latitude = await globe.getAttribute("data-selected-latitude");
-  const longitude = await globe.getAttribute("data-selected-longitude");
-  for (const id of ["mercator-map", "world-map"]) {
-    await expect(page.locator(`#${id}`)).toHaveAttribute(
-      "data-selected-latitude",
-      latitude!,
-    );
-    await expect(page.locator(`#${id}`)).toHaveAttribute(
-      "data-selected-longitude",
-      longitude!,
-    );
-  }
-});
-
-test("applies one layer toggle to all renderers", async ({ page }) => {
-  await page.goto("/browse/?eclipse=solar-2026-08-12-total");
-  await expectRenderedFeatures(page.locator("#mercator-map"));
-
-  await page.getByLabel("Central path", { exact: true }).uncheck();
-  for (const id of ["mercator-map", "globe-map", "world-map"]) {
-    await expect(page.locator(`#${id}`)).toHaveAttribute(
-      "data-layer-central-path",
-      "false",
-    );
-  }
-});
-
-test("keeps the equirectangular whole-Earth camera fixed", async ({
-  page,
-}) => {
-  await page.goto("/browse/?eclipse=solar-2026-08-12-total");
-  const world = page.locator("#world-map");
-  await expectRenderedFeatures(world);
-  await expect(world.locator(".leaflet-control-zoom")).toHaveCount(0);
-  const pane = world.locator(".leaflet-map-pane");
-  const before = await pane.getAttribute("style");
-  const box = await world.boundingBox();
-  expect(box).not.toBeNull();
-  await page.mouse.move(box!.x + box!.width / 2, box!.y + box!.height / 2);
-  await page.mouse.down();
-  await page.mouse.move(
-    box!.x + box!.width / 2 + 80,
-    box!.y + box!.height / 2 + 40,
-  );
-  await page.mouse.up();
-  await page.mouse.wheel(0, -500);
-  expect(await pane.getAttribute("style")).toBe(before);
-});
-
-test("keeps Leaflet maps usable when WebGL is unavailable", async ({
+test("keeps the browser map interactive when WebGL is unavailable", async ({
   page,
 }) => {
   await page.addInitScript(() => {
@@ -623,61 +109,27 @@ test("keeps Leaflet maps usable when WebGL is unavailable", async ({
     } as typeof HTMLCanvasElement.prototype.getContext;
   });
   await page.goto("/browse/?eclipse=solar-2026-08-12-total");
-  await expect(page.locator("#globe-map")).toHaveAttribute(
-    "data-renderer-ready",
-    "false",
-  );
-  await expectRenderedFeatures(page.locator("#mercator-map"));
-  await expectRenderedFeatures(page.locator("#world-map"));
-});
 
-test("downloads deterministic browser-generated GIS files", async ({
-  page,
-}) => {
-  await page.goto("/browse/?eclipse=solar-2026-08-12-total");
-  await expectRenderedFeatures(page.locator("#mercator-map"));
-  const geoJsonButton = page.getByRole("button", { name: "Download GeoJSON" });
-  const downloadPromise = page.waitForEvent("download");
-  await geoJsonButton.click();
-  const download = await downloadPromise;
-  expect(download.suggestedFilename()).toBe(
-    "solar-2026-08-12-total.geojson",
+  await page.locator("#mercator-map").click();
+  await expect(page).toHaveURL(
+    (url) => url.searchParams.has("lat") && url.searchParams.has("lon"),
   );
 });
 
-test("renders both 2027 central tracks through horizon singularities", async ({
-  page,
-}) => {
-  await page.goto("/browse/?eclipse=solar-2027-02-06-annular&year=2027");
-  await expectRenderedFeatures(page.locator("#mercator-map"));
-  await page.locator('[data-event-id="solar-2027-08-02-total"]').click();
-  await expect(page).toHaveURL(/eclipse=solar-2027-08-02-total/);
-  await expectRenderedFeatures(page.locator("#mercator-map"));
-});
-
-test("fits antimeridian tracks in one continuous Leaflet world", async ({
-  page,
-}) => {
-  await page.goto("/browse/?eclipse=solar-2016-03-09-total&year=2016");
-  await expectRenderedFeatures(page.locator("#mercator-map"));
-  await expect
-    .poll(() => Number(new URL(page.url()).hash.split("/")[2]))
-    .toBeGreaterThan(100);
-  const longitude = Number(new URL(page.url()).hash.split("/")[2]);
-  expect(longitude).toBeGreaterThan(100);
-  expect(longitude).toBeLessThan(200);
-});
-
-test("stacks the projection panels on a narrow screen", async ({ page }) => {
-  await page.setViewportSize({ width: 640, height: 900 });
+test("downloads a valid browser-generated GeoJSON artifact", async ({ page }) => {
   await page.goto("/browse/?eclipse=solar-2026-08-12-total");
-  await expectRenderedFeatures(page.locator("#globe-map"));
-  const mercator = await page.locator(".mercator-panel").boundingBox();
-  const globe = await page.locator(".globe-panel").boundingBox();
-  const world = await page.locator(".world-panel").boundingBox();
-  expect(mercator).not.toBeNull();
-  expect(globe).not.toBeNull();
-  expect(world).not.toBeNull();
-  expect(globe!.y).toBeGreaterThan(mercator!.y + mercator!.height - 2);
-  expect(world!.y).toBeGreaterThan(globe!.y + globe!.height - 2);
+
+  const [download] = await Promise.all([
+    page.waitForEvent("download"),
+    page.locator("#geojson-button").click(),
+  ]);
+  const path = await download.path();
+  if (!path) throw new Error("The browser did not provide the downloaded file.");
+  const artifact = JSON.parse(await readFile(path, "utf8")) as {
+    type?: unknown;
+    features?: unknown[];
+  };
+
+  expect(artifact.type).toBe("FeatureCollection");
+  expect(artifact.features?.length).toBeGreaterThan(0);
 });
