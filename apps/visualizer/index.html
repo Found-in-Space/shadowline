@@ -70,7 +70,11 @@
           </ul>
         </div>
 
-        <figure class="eclipse-figure" role="img" aria-label="The Moon’s shadow crossing a view of Earth">
+        <figure
+          class="eclipse-figure"
+          aria-labelledby="eclipse-countdown-value"
+          aria-describedby="eclipse-countdown-detail"
+        >
           <div class="sun-glow" aria-hidden="true"></div>
           <div class="orbit orbit-far" aria-hidden="true"></div>
           <div class="orbit orbit-near" aria-hidden="true"></div>
@@ -80,9 +84,14 @@
             <span class="shadow-point"></span>
           </div>
           <div class="moon" aria-hidden="true"></div>
-          <figcaption>
-            <span>12 August 2026</span>
-            <strong>The Moon’s shadow crosses the North Atlantic</strong>
+          <figcaption id="eclipse-countdown" data-state="upcoming">
+            <span id="eclipse-countdown-kicker" class="countdown-kicker">Next eclipse begins in</span>
+            <time
+              id="eclipse-countdown-value"
+              class="countdown-value"
+              datetime="2026-08-12T15:34:05.639Z"
+            >12 August 2026</time>
+            <span id="eclipse-countdown-detail" class="countdown-detail">First shadow touches Earth at 15:34 UTC</span>
           </figcaption>
         </figure>
       </section>
@@ -258,5 +267,6 @@
     <!-- 100% privacy-first analytics -->
     <script data-collect-dnt="true" async src="https://scripts.simpleanalyticscdn.com/latest.js"></script>
     <noscript><img src="https://queue.simpleanalyticscdn.com/noscript.gif?collect-dnt=true" alt="" referrerpolicy="no-referrer-when-downgrade"></noscript>
+    <script type="module" src="/src/landing.ts"></script>
   </body>
 </html>

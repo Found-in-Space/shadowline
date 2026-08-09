@@ -447,8 +447,9 @@ h1 span {
   bottom: 7%;
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  max-width: 250px;
+  gap: 7px;
+  width: max-content;
+  max-width: min(300px, 92%);
   padding: 14px 17px;
   border: 1px solid var(--line);
   border-radius: 14px;
@@ -458,7 +459,7 @@ h1 span {
   font-family: var(--ui);
 }
 
-.eclipse-figure figcaption span {
+.eclipse-figure figcaption .countdown-kicker {
   color: var(--gold);
   font-size: 0.66rem;
   font-weight: 800;
@@ -466,9 +467,33 @@ h1 span {
   text-transform: uppercase;
 }
 
-.eclipse-figure figcaption strong {
-  font-size: 0.84rem;
-  line-height: 1.35;
+.eclipse-figure figcaption .countdown-value {
+  color: var(--text);
+  font-size: clamp(1.55rem, 3.2vw, 2.15rem);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.04em;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.eclipse-figure figcaption .countdown-detail {
+  color: var(--muted);
+  font-size: 0.67rem;
+  font-weight: 600;
+  letter-spacing: 0;
+  line-height: 1.4;
+  text-transform: none;
+}
+
+.eclipse-figure figcaption[data-state="live"] {
+  border-color: var(--line-strong);
+  background: rgb(9 18 32 / 90%);
+}
+
+.eclipse-figure figcaption[data-state="live"] .countdown-value {
+  color: var(--gold);
+  text-shadow: 0 0 24px rgb(242 200 121 / 24%);
 }
 
 .routes,
