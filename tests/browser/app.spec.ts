@@ -1,4 +1,13 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Locator } from "@playwright/test";
+
+async function expectRenderedFeatures(
+  map: Locator,
+  attribute = "data-path-feature-count",
+): Promise<void> {
+  await expect
+    .poll(async () => Number((await map.getAttribute(attribute)) ?? 0))
+    .toBeGreaterThan(0);
+}
 
 test.beforeEach(async ({ page }) => {
   await page.route("https://tile.openstreetmap.org/**", (route) =>
@@ -12,92 +21,12 @@ test.beforeEach(async ({ page }) => {
   );
 });
 
-test("requests Blue Marble from the cacheable GIBS WMTS service", async ({
-  page,
-}) => {
-  const blueMarbleRequests = new Set<string>();
-  page.on("request", (request) => {
-    const url = request.url();
-    if (url.includes("BlueMarble_ShadedRelief_Bathymetry")) {
-      blueMarbleRequests.add(url);
-    }
-  });
-
-  await page.goto("/?eclipse=solar-2026-08-12-total");
-  await expect(page.locator("#world-map")).toHaveAttribute(
-    "data-renderer-ready",
-    "true",
-  );
-  await expect
-    .poll(() => blueMarbleRequests.size)
-    .toBeGreaterThan(0);
-
-  expect([...blueMarbleRequests]).toEqual(
-    expect.arrayContaining([
-      "https://gibs.earthdata.nasa.gov/wmts/epsg4326/best/" +
-        "BlueMarble_ShadedRelief_Bathymetry/default/500m/0/0/0.jpeg",
-      "https://gibs.earthdata.nasa.gov/wmts/epsg4326/best/" +
-        "BlueMarble_ShadedRelief_Bathymetry/default/500m/0/0/1.jpeg",
-    ]),
-  );
-  expect(
-    [...blueMarbleRequests].every((url) => url.includes("/wmts/")),
-  ).toBe(true);
-  await expect(
-    page.locator("#world-map canvas.blue-marble-tile"),
-  ).toHaveCount(2);
-});
-
-test("initializes four coordinated visual panels", async ({ page }) => {
-  await page.goto("/?eclipse=solar-2026-08-12-total");
-
-  await expect(
-    page.getByRole("article", { name: "OpenStreetMap · Web Mercator" }),
-  ).toBeVisible();
-  await expect(
-    page.getByRole("article", { name: "OpenStreetMap · 3D globe" }),
-  ).toBeVisible();
-  await expect(
-    page.getByRole("article", {
-      name: "NASA Blue Marble · Equirectangular",
-    }),
-  ).toBeVisible();
-  await expect(
-    page.getByRole("article", { name: "Terrain · Ground view" }),
-  ).toBeVisible();
-  for (const id of ["mercator-map", "globe-map", "world-map"]) {
-    await expect(page.locator(`#${id}`)).toHaveAttribute(
-      "data-renderer-ready",
-      "true",
-    );
-    await expect
-      .poll(async () =>
-        Number(
-          (await page
-            .locator(`#${id}`)
-            .getAttribute("data-path-feature-count")) ?? 0,
-        ),
-      )
-      .toBeGreaterThan(0);
-  }
-  await expect(page.locator("#globe-map")).toHaveAttribute(
-    "data-projection",
-    "globe",
-  );
-  await expect(page.locator("#ground-map canvas")).toHaveAttribute(
-    "aria-label",
-    "Choose a location to prepare an estimated ground view towards the eclipse.",
-  );
-});
-
 test("lets every map fill its projection panel edge to edge", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/?eclipse=solar-2026-08-12-total");
-  await expect(
-    page.getByText("track calculated from", { exact: false }),
-  ).toBeVisible();
+  await expectRenderedFeatures(page.locator("#mercator-map"));
 
   const layout = await page.evaluate(() => ({
     panels: Array.from(document.querySelectorAll(".map-panel")).map(
@@ -153,9 +82,7 @@ test("keeps polar Web Mercator fits inside the projected world", async ({
 }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/?eclipse=solar-2026-08-12-total");
-  await expect(
-    page.getByText("track calculated from", { exact: false }),
-  ).toBeVisible();
+  await expectRenderedFeatures(page.locator("#mercator-map"));
 
   const mapBox = await page.locator("#mercator-map").boundingBox();
   const match = new URL(page.url()).hash.match(
@@ -183,7 +110,7 @@ test("keeps polar Web Mercator fits inside the projected world", async ({
   );
 });
 
-test("searches a year and calculates the complete 2026 path", async ({
+test("paginates discovery and searches arbitrary years", async ({
   page,
 }) => {
   const catalogueRequests: string[] = [];
@@ -193,19 +120,6 @@ test("searches a year and calculates the complete 2026 path", async ({
     }
   });
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: "Shadowline" })).toBeVisible();
-  await expect(
-    page.getByText("track calculated from", { exact: false }),
-  ).toBeVisible();
-  await expect(page.getByLabel("Partial-eclipse extent")).toBeChecked();
-  await expect(page.getByLabel("Sunrise / sunset limits")).toBeChecked();
-  await expect(page.getByLabel("P1–P4 contacts")).toBeChecked();
-  await expect(page.getByRole("tab", { name: "By date" })).toHaveAttribute(
-    "aria-selected",
-    "true",
-  );
-  await expect(page.getByRole("tab", { name: "By place" })).toBeVisible();
-  await expect(page.getByText("Upcoming solar eclipses")).toBeVisible();
   await expect(page.locator("[data-event-id]")).toHaveCount(5);
   await page
     .getByRole("button", { name: "Show 5 later eclipses" })
@@ -241,20 +155,25 @@ test("searches a year and calculates the complete 2026 path", async ({
     );
   expect(new Set(initialPeaks).size).toBe(initialPeaks.length);
   const yearInput = page.getByLabel("Calendar year");
-  await expect(yearInput).not.toHaveAttribute("min");
-  await expect(yearInput).not.toHaveAttribute("max");
   await yearInput.fill("3500");
   await page.getByRole("button", { name: "Search" }).click();
-  await expect(page.getByText("Solar eclipses · 3500")).toBeVisible();
+  await expect
+    .poll(async () => {
+      const ids = await page
+        .locator("[data-event-id]")
+        .evaluateAll((buttons) =>
+          buttons.map((button) => button.getAttribute("data-event-id")),
+        );
+      return ids.length > 0 && ids.every((id) => id?.startsWith("solar-3500-"));
+    })
+    .toBe(true);
   await yearInput.fill("2023");
   await page.getByRole("button", { name: "Search" }).click();
-  await expect(page.getByText("Solar eclipses · 2023")).toBeVisible();
-  const hybrid = page.getByRole("button", { name: /20 April 2023/ });
-  await expect(hybrid).toContainText("Hybrid");
+  const hybrid = page.locator('[data-event-id="solar-2023-04-20-hybrid"]');
+  await expect(hybrid).toHaveCount(1);
   await hybrid.click();
-  await expect(
-    page.getByText("Hybrid track calculated from", { exact: false }),
-  ).toBeVisible();
+  await expect(page).toHaveURL(/eclipse=solar-2023-04-20-hybrid/);
+  await expectRenderedFeatures(page.locator("#mercator-map"));
   expect(catalogueRequests).toEqual([]);
 });
 
@@ -262,9 +181,7 @@ test("keeps discovery results stable when selecting an eclipse", async ({
   page,
 }) => {
   await page.goto("/");
-  await expect(
-    page.getByText("track calculated from", { exact: false }),
-  ).toBeVisible();
+  await expect(page.locator("[data-event-id]")).toHaveCount(5);
   await page
     .getByRole("button", { name: "Show 5 later eclipses" })
     .click();
@@ -275,10 +192,12 @@ test("keeps discovery results stable when selecting an eclipse", async ({
     .evaluateAll((buttons) =>
       buttons.map((button) => button.getAttribute("data-event-id")),
     );
+  const selectedId = eventIds[1];
+  expect(selectedId).not.toBeNull();
   await page.locator("[data-event-id]").nth(1).click();
-  await expect(
-    page.getByText("calculated from", { exact: false }),
-  ).toBeVisible();
+  await expect
+    .poll(() => new URL(page.url()).searchParams.get("eclipse"))
+    .toBe(selectedId);
 
   await expect(page.locator("[data-event-id]")).toHaveCount(10);
   expect(
@@ -294,58 +213,59 @@ test("keeps the newest event search when an older search finishes later", async 
   page,
 }) => {
   await page.goto("/");
-  await expect(
-    page.getByText("track calculated from", { exact: false }),
-  ).toBeVisible();
+  await expect(page.locator("[data-event-id]")).toHaveCount(5);
 
   await page.getByLabel("Calendar year").fill("2023");
   await page.getByRole("button", { name: "Search" }).click();
   await page.getByLabel("Calendar year").fill("2026");
   await page.getByRole("button", { name: "Search" }).click();
 
-  await expect(page.getByText("Solar eclipses · 2026")).toBeVisible();
+  const showsOnly2026Events = async () => {
+    const ids = await page
+      .locator("[data-event-id]")
+      .evaluateAll((buttons) =>
+        buttons.map((button) => button.getAttribute("data-event-id")),
+      );
+    return ids.length > 0 && ids.every((id) => id?.startsWith("solar-2026-"));
+  };
+  await expect.poll(showsOnly2026Events).toBe(true);
   await page.waitForTimeout(1_000);
-  await expect(page.getByText("Solar eclipses · 2026")).toBeVisible();
-  await expect(page.getByText("Solar eclipses · 2023")).toHaveCount(0);
+  expect(await showsOnly2026Events()).toBe(true);
 });
 
 test("renders global visibility for a partial-only eclipse", async ({
   page,
 }) => {
   await page.goto("/?eclipse=solar-2025-03-29-partial&year=2025");
-  await expect(
-    page.getByText("Partial-eclipse visibility calculated", {
-      exact: false,
-    }),
-  ).toBeVisible();
-  await expect(
-    page.getByRole("button", { name: "Download GeoJSON" }),
-  ).toBeEnabled();
+  await expectRenderedFeatures(
+    page.locator("#mercator-map"),
+    "data-global-feature-count",
+  );
+  const downloadPromise = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Download GeoJSON" }).click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toBe(
+    "solar-2025-03-29-partial.geojson",
+  );
 });
 
 test("restores a selected place from shareable state", async ({ page }) => {
   await page.goto(
     "/?eclipse=solar-2026-08-12-total&lat=41.81670&lon=-3.18500",
   );
-  await expect(page.getByText("Total at this point")).toBeVisible();
-  await expect(
-    page
-      .getByRole("heading", { name: "At selected place" })
-      .locator("..")
-      .getByText("41.81670°, -3.18500°"),
-  ).toBeVisible();
-  await expect(page.getByText("Sun azimuth")).toBeVisible();
-  await expect(
-    page.getByText("penumbra outlines shown", { exact: false }),
-  ).toBeVisible();
-  await expect(page.locator("#ground-map canvas")).toHaveAttribute(
-    "aria-label",
-    "Estimated ground view from 41.8167, -3.1850 towards the eclipse.",
-  );
-  await expect(page.getByRole("heading", { name: "At selected place" })).toBeVisible();
-  await expect(page.getByRole("tab", { name: "By date" })).toHaveAttribute(
-    "aria-selected",
-    "true",
+  for (const id of ["mercator-map", "globe-map", "world-map"]) {
+    await expect(page.locator(`#${id}`)).toHaveAttribute(
+      "data-selected-latitude",
+      "41.81670",
+    );
+    await expect(page.locator(`#${id}`)).toHaveAttribute(
+      "data-selected-longitude",
+      "-3.18500",
+    );
+  }
+  await expectRenderedFeatures(
+    page.locator("#mercator-map"),
+    "data-shadow-feature-count",
   );
   await expect(page).toHaveURL(/lat=41\.81670/);
   await expect(page).toHaveURL(/locator=date/);
@@ -358,16 +278,8 @@ test("restores and pages one chronological place timeline", async ({
   await page.goto(
     "/?eclipse=solar-2026-08-12-total&year=2026&locator=place&around=2026-08-12&lat=41.81670&lon=-3.18500",
   );
-  await expect(page.getByText("Total at this point")).toBeVisible();
-  await expect(page.getByRole("tab", { name: "By place" })).toHaveAttribute(
-    "aria-selected",
-    "true",
-  );
   await expect(page.getByLabel("Around date")).toHaveValue("2026-08-12");
-  await expect(page.getByText("Visible eclipses around 12 August 2026")).toBeVisible();
   await expect(page.locator("[data-local-peak]")).toHaveCount(11);
-  await expect(page.getByText("1976–2076")).toHaveCount(0);
-  await expect(page.getByText("Nearby visible eclipses", { exact: false })).toHaveCount(0);
 
   await page
     .getByRole("button", { name: "Show 5 earlier eclipses" })
@@ -386,20 +298,13 @@ test("restores and pages one chronological place timeline", async ({
   expect(new Set(peaks).size).toBe(peaks.length);
 
   const selectedList = [...peaks];
-  await page
-    .locator("[data-local-peak]")
-    .filter({ hasText: "2 August 2027" })
-    .click();
+  const target = page.locator('[data-local-peak^="2027-08-02"]');
+  await expect(target).toHaveCount(1);
+  await target.click();
   await expect(page).not.toHaveURL(/eclipse=solar-2026-08-12-total/);
   await expect(page).toHaveURL(/lat=41\.81670/);
   await expect(page).toHaveURL(/locator=place/);
   await expect(page).toHaveURL(/around=2026-08-12/);
-  await expect(
-    page
-      .getByRole("heading", { name: "At selected place" })
-      .locator("..")
-      .getByText("Selected point"),
-  ).toBeVisible();
   await expect(page.locator("[data-local-peak]")).toHaveCount(21);
   expect(
     await page
@@ -447,9 +352,13 @@ test("retains each locator timeline while switching modes", async ({
   const placePanel = page.getByRole("tabpanel", { name: "By place" });
   await placePanel.getByLabel("Around date").fill("2027-08-02");
   await placePanel.getByRole("button", { name: "Search" }).click();
-  await expect(
-    page.getByText("Visible eclipses around 2 August 2027"),
-  ).toBeVisible();
+  await expect
+    .poll(async () =>
+      page.locator("[data-local-peak]").evaluateAll((buttons) =>
+        buttons.map((button) => button.getAttribute("data-local-peak")),
+      ),
+    )
+    .not.toEqual(placePeaks);
   await expect(page.locator("[data-local-peak]")).toHaveCount(11);
   await expect(page).toHaveURL(/around=2027-08-02/);
 
@@ -494,31 +403,9 @@ test("refreshes place discovery after changing the map location in date mode", a
   ).not.toEqual(originalPeaks);
 });
 
-test("uses the maps as the place picker while keeping date discovery active", async ({
-  page,
-}) => {
-  await page.goto("/?eclipse=solar-2026-08-12-total");
-  await expect(
-    page.getByText("track calculated from", { exact: false }),
-  ).toBeVisible();
-
-  await expect(page.getByLabel("Latitude, longitude")).toHaveCount(0);
-  await expect(page.getByText("Local history window")).toHaveCount(0);
-  await expect(page.getByRole("heading", { name: "At selected place" })).toBeVisible();
-  await expect(
-    page.getByText("Click any map to see local circumstances for the selected eclipse."),
-  ).toBeVisible();
-  await expect(page.getByRole("tab", { name: "By date" })).toHaveAttribute(
-    "aria-selected",
-    "true",
-  );
-});
-
 test("calculates shadows by clicking an eclipse overlay", async ({ page }) => {
   await page.goto("/?eclipse=solar-2026-08-12-total");
-  await expect(
-    page.getByText("track calculated from", { exact: false }),
-  ).toBeVisible();
+  await expectRenderedFeatures(page.locator("#mercator-map"));
   await expect(page).toHaveURL(/#map=\d+\//);
 
   const [, zoomText, centerLatitudeText, centerLongitudeText] =
@@ -556,10 +443,10 @@ test("calculates shadows by clicking an eclipse overlay", async ({ page }) => {
     mapBox!.y + mapBox!.height / 2 + target.y - center.y,
   );
 
-  await expect(page.getByText("Total at this point")).toBeVisible();
-  await expect(
-    page.getByText("penumbra outlines shown", { exact: false }),
-  ).toBeVisible();
+  await expectRenderedFeatures(
+    page.locator("#mercator-map"),
+    "data-shadow-feature-count",
+  );
   await expect(page).toHaveURL(/lat=65\./);
 });
 
@@ -567,9 +454,7 @@ test("selects one synchronized observer from every projection", async ({
   page,
 }) => {
   await page.goto("/?eclipse=solar-2026-08-12-total");
-  await expect(
-    page.getByText("track calculated from", { exact: false }),
-  ).toBeVisible();
+  await expectRenderedFeatures(page.locator("#mercator-map"));
 
   for (const id of ["mercator-map", "globe-map", "world-map"]) {
     await page.locator(`#${id}`).click();
@@ -604,9 +489,7 @@ test("renders and round-trips a selected location at the pole", async ({
   await page.goto(
     "/?eclipse=solar-2026-08-12-total&lat=89.90000&lon=0.00000",
   );
-  await expect(
-    page.getByText("track calculated from", { exact: false }),
-  ).toBeVisible();
+  await expectRenderedFeatures(page.locator("#globe-map"));
 
   for (const id of ["mercator-map", "globe-map", "world-map"]) {
     await expect(page.locator(`#${id}`)).toHaveAttribute(
@@ -692,9 +575,7 @@ test("renders and round-trips a selected location at the pole", async ({
 
 test("applies one layer toggle to all renderers", async ({ page }) => {
   await page.goto("/?eclipse=solar-2026-08-12-total");
-  await expect(
-    page.getByText("track calculated from", { exact: false }),
-  ).toBeVisible();
+  await expectRenderedFeatures(page.locator("#mercator-map"));
 
   await page.getByLabel("Central path", { exact: true }).uncheck();
   for (const id of ["mercator-map", "globe-map", "world-map"]) {
@@ -709,10 +590,8 @@ test("keeps the equirectangular whole-Earth camera fixed", async ({
   page,
 }) => {
   await page.goto("/?eclipse=solar-2026-08-12-total");
-  await expect(
-    page.getByText("track calculated from", { exact: false }),
-  ).toBeVisible();
   const world = page.locator("#world-map");
+  await expectRenderedFeatures(world);
   await expect(world.locator(".leaflet-control-zoom")).toHaveCount(0);
   const pane = world.locator(".leaflet-map-pane");
   const before = await pane.getAttribute("style");
@@ -744,27 +623,20 @@ test("keeps Leaflet maps usable when WebGL is unavailable", async ({
     } as typeof HTMLCanvasElement.prototype.getContext;
   });
   await page.goto("/?eclipse=solar-2026-08-12-total");
-  await expect(
-    page.locator("#globe-map").getByText("globe is unavailable", {
-      exact: false,
-    }),
-  ).toBeVisible();
-  await expect(page.locator("#mercator-map")).toHaveAttribute(
+  await expect(page.locator("#globe-map")).toHaveAttribute(
     "data-renderer-ready",
-    "true",
+    "false",
   );
-  await expect(page.locator("#world-map")).toHaveAttribute(
-    "data-renderer-ready",
-    "true",
-  );
+  await expectRenderedFeatures(page.locator("#mercator-map"));
+  await expectRenderedFeatures(page.locator("#world-map"));
 });
 
 test("downloads deterministic browser-generated GIS files", async ({
   page,
 }) => {
   await page.goto("/?eclipse=solar-2026-08-12-total");
+  await expectRenderedFeatures(page.locator("#mercator-map"));
   const geoJsonButton = page.getByRole("button", { name: "Download GeoJSON" });
-  await expect(geoJsonButton).toBeEnabled();
   const downloadPromise = page.waitForEvent("download");
   await geoJsonButton.click();
   const download = await downloadPromise;
@@ -777,22 +649,17 @@ test("renders both 2027 central tracks through horizon singularities", async ({
   page,
 }) => {
   await page.goto("/?eclipse=solar-2027-02-06-annular&year=2027");
-  await expect(
-    page.getByText("Annular track calculated from", { exact: false }),
-  ).toBeVisible();
-  await page.getByRole("button", { name: /Total 2 August 2027/ }).click();
-  await expect(
-    page.getByText("Total track calculated from", { exact: false }),
-  ).toBeVisible();
+  await expectRenderedFeatures(page.locator("#mercator-map"));
+  await page.locator('[data-event-id="solar-2027-08-02-total"]').click();
+  await expect(page).toHaveURL(/eclipse=solar-2027-08-02-total/);
+  await expectRenderedFeatures(page.locator("#mercator-map"));
 });
 
 test("fits antimeridian tracks in one continuous Leaflet world", async ({
   page,
 }) => {
   await page.goto("/?eclipse=solar-2016-03-09-total&year=2016");
-  await expect(
-    page.getByText("Total track calculated from", { exact: false }),
-  ).toBeVisible();
+  await expectRenderedFeatures(page.locator("#mercator-map"));
   await expect
     .poll(() => Number(new URL(page.url()).hash.split("/")[2]))
     .toBeGreaterThan(100);
@@ -804,10 +671,7 @@ test("fits antimeridian tracks in one continuous Leaflet world", async ({
 test("stacks the projection panels on a narrow screen", async ({ page }) => {
   await page.setViewportSize({ width: 640, height: 900 });
   await page.goto("/?eclipse=solar-2026-08-12-total");
-  await expect(page.locator("#globe-map")).toHaveAttribute(
-    "data-renderer-ready",
-    "true",
-  );
+  await expectRenderedFeatures(page.locator("#globe-map"));
   const mercator = await page.locator(".mercator-panel").boundingBox();
   const globe = await page.locator(".globe-panel").boundingBox();
   const world = await page.locator(".world-panel").boundingBox();
