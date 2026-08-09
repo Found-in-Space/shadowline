@@ -7,6 +7,9 @@ test.beforeEach(async ({ page }) => {
   await page.route("https://gibs.earthdata.nasa.gov/**", (route) =>
     route.abort(),
   );
+  await page.route("https://tiles.mapterhorn.com/**", (route) =>
+    route.abort(),
+  );
 });
 
 test("requests Blue Marble from the cacheable GIBS WMTS service", async ({
@@ -45,7 +48,7 @@ test("requests Blue Marble from the cacheable GIBS WMTS service", async ({
   ).toHaveCount(2);
 });
 
-test("initializes three coordinated projection panels", async ({ page }) => {
+test("initializes four coordinated visual panels", async ({ page }) => {
   await page.goto("/?eclipse=solar-2026-08-12-total");
 
   await expect(
@@ -58,6 +61,9 @@ test("initializes three coordinated projection panels", async ({ page }) => {
     page.getByRole("article", {
       name: "NASA Blue Marble · Equirectangular",
     }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("article", { name: "Terrain · Ground view" }),
   ).toBeVisible();
   for (const id of ["mercator-map", "globe-map", "world-map"]) {
     await expect(page.locator(`#${id}`)).toHaveAttribute(
@@ -77,6 +83,10 @@ test("initializes three coordinated projection panels", async ({ page }) => {
   await expect(page.locator("#globe-map")).toHaveAttribute(
     "data-projection",
     "globe",
+  );
+  await expect(page.locator("#ground-map canvas")).toHaveAttribute(
+    "aria-label",
+    "Choose a location to prepare an estimated ground view towards the eclipse.",
   );
 });
 
@@ -113,7 +123,7 @@ test("lets every map fill its projection panel edge to edge", async ({
     ),
   }));
 
-  expect(layout.panels).toHaveLength(3);
+  expect(layout.panels).toHaveLength(4);
   for (const { panel, map } of layout.panels) {
     expect(map.top).toBeCloseTo(panel.top, 5);
     expect(map.right).toBeCloseTo(panel.right, 5);
@@ -126,6 +136,14 @@ test("lets every map fill its projection panel edge to edge", async ({
   );
   expect(layout.panels[0]!.panel.bottom).toBeCloseTo(
     layout.panels[2]!.panel.top,
+    5,
+  );
+  expect(layout.panels[2]!.panel.right).toBeCloseTo(
+    layout.panels[3]!.panel.left,
+    5,
+  );
+  expect(layout.panels[1]!.panel.bottom).toBeCloseTo(
+    layout.panels[3]!.panel.top,
     5,
   );
 });
@@ -320,6 +338,10 @@ test("restores a selected place from shareable state", async ({ page }) => {
   await expect(
     page.getByText("penumbra outlines shown", { exact: false }),
   ).toBeVisible();
+  await expect(page.locator("#ground-map canvas")).toHaveAttribute(
+    "aria-label",
+    "Estimated ground view from 41.8167, -3.1850 towards the eclipse.",
+  );
   await expect(page.getByRole("heading", { name: "At selected place" })).toBeVisible();
   await expect(page.getByRole("tab", { name: "By date" })).toHaveAttribute(
     "aria-selected",
