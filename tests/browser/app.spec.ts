@@ -98,6 +98,21 @@ test("turns clicks in either map into a shareable observer", async ({ page }) =>
   }
 });
 
+test("labels the Spacefarer view with its displayed instant", async ({
+  page,
+}) => {
+  await page.goto(
+    "/browse/?eclipse=solar-2026-08-12-total&lat=65&lon=-20",
+  );
+
+  await expect(page.locator("#spacefarer-status")).toContainText(
+    /^Local maximum · \d{2}:\d{2}:\d{2} UTC ·/,
+  );
+  await expect(page.locator("#spacefarer-status")).not.toContainText(
+    "All four views",
+  );
+});
+
 test("keeps the browser map interactive when WebGL is unavailable", async ({
   page,
 }) => {
