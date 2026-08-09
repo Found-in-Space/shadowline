@@ -10,6 +10,7 @@ import type {
 import { ecefToGeodetic } from "@found-in-space/shadowline";
 import { MapLibreGlobeRenderer } from "./maplibre-renderer.js";
 import type { LeafletMercatorRenderer } from "./leaflet-renderer.js";
+import { parseCoordinatePair } from "./location-input.js";
 import type { TrackerGroundView } from "./tracker-ground-view.js";
 import type { TrackerShadowView } from "./tracker-shadow-view.js";
 import {
@@ -1119,6 +1120,17 @@ manualToggle.addEventListener("click", () => {
   manualToggle.setAttribute("aria-expanded", String(!expanded));
   manualLocation.hidden = expanded;
   if (!expanded) latitudeInput.focus();
+});
+
+latitudeInput.addEventListener("paste", (pasteEvent) => {
+  const coordinates = parseCoordinatePair(
+    pasteEvent.clipboardData?.getData("text/plain") ?? "",
+  );
+  if (!coordinates) return;
+
+  pasteEvent.preventDefault();
+  latitudeInput.value = String(coordinates.latitude);
+  longitudeInput.value = String(coordinates.longitude);
 });
 
 manualLocation.addEventListener("submit", (submitEvent) => {
