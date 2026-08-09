@@ -73,10 +73,12 @@ historical, and published-reference checks live in the separately invoked
 `test:validation` tier so they cannot make the sandbox-oriented unit command
 unreliable.
 
-Open `http://127.0.0.1:5173`. The application and eclipse calculations run
-locally. Standard OpenStreetMap raster tiles are requested over the network for
-the two interactive top views, and the fixed whole-Earth view requests NASA
-Blue Marble imagery from GIBS's cacheable geographic WMTS service.
+Open `http://127.0.0.1:5173` for the Shadowline project introduction, or
+`http://127.0.0.1:5173/browse/` for the eclipse explorer. The application and
+eclipse calculations run locally. Standard OpenStreetMap raster tiles are
+requested over the network for the two interactive top views, and the fixed
+whole-Earth view requests NASA Blue Marble imagery from GIBS's cacheable
+geographic WMTS service.
 
 The 2026 eclipse tracker also has a location-fixed Ground view. Elevation tiles
 are requested directly from Mapterhorn. To add MapTiler Satellite photography,

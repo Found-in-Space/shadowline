@@ -25,7 +25,7 @@ test("lets every map fill its projection panel edge to edge", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
-  await page.goto("/?eclipse=solar-2026-08-12-total");
+  await page.goto("/browse/?eclipse=solar-2026-08-12-total");
   await expectRenderedFeatures(page.locator("#mercator-map"));
 
   const layout = await page.evaluate(() => ({
@@ -81,7 +81,7 @@ test("keeps polar Web Mercator fits inside the projected world", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
-  await page.goto("/?eclipse=solar-2026-08-12-total");
+  await page.goto("/browse/?eclipse=solar-2026-08-12-total");
   await expectRenderedFeatures(page.locator("#mercator-map"));
 
   const mapBox = await page.locator("#mercator-map").boundingBox();
@@ -119,7 +119,7 @@ test("paginates discovery and searches arbitrary years", async ({
       catalogueRequests.push(request.url());
     }
   });
-  await page.goto("/");
+  await page.goto("/browse/");
   await expect(page.locator("[data-event-id]")).toHaveCount(5);
   await page
     .getByRole("button", { name: "Show 5 later eclipses" })
@@ -180,7 +180,7 @@ test("paginates discovery and searches arbitrary years", async ({
 test("keeps discovery results stable when selecting an eclipse", async ({
   page,
 }) => {
-  await page.goto("/");
+  await page.goto("/browse/");
   await expect(page.locator("[data-event-id]")).toHaveCount(5);
   await page
     .getByRole("button", { name: "Show 5 later eclipses" })
@@ -212,7 +212,7 @@ test("keeps discovery results stable when selecting an eclipse", async ({
 test("keeps the newest event search when an older search finishes later", async ({
   page,
 }) => {
-  await page.goto("/");
+  await page.goto("/browse/");
   await expect(page.locator("[data-event-id]")).toHaveCount(5);
 
   await page.getByLabel("Calendar year").fill("2023");
@@ -236,7 +236,7 @@ test("keeps the newest event search when an older search finishes later", async 
 test("renders global visibility for a partial-only eclipse", async ({
   page,
 }) => {
-  await page.goto("/?eclipse=solar-2025-03-29-partial&year=2025");
+  await page.goto("/browse/?eclipse=solar-2025-03-29-partial&year=2025");
   await expectRenderedFeatures(
     page.locator("#mercator-map"),
     "data-global-feature-count",
@@ -251,7 +251,7 @@ test("renders global visibility for a partial-only eclipse", async ({
 
 test("restores a selected place from shareable state", async ({ page }) => {
   await page.goto(
-    "/?eclipse=solar-2026-08-12-total&lat=41.81670&lon=-3.18500",
+    "/browse/?eclipse=solar-2026-08-12-total&lat=41.81670&lon=-3.18500",
   );
   for (const id of ["mercator-map", "globe-map", "world-map"]) {
     await expect(page.locator(`#${id}`)).toHaveAttribute(
@@ -276,7 +276,7 @@ test("restores and pages one chronological place timeline", async ({
   page,
 }) => {
   await page.goto(
-    "/?eclipse=solar-2026-08-12-total&year=2026&locator=place&around=2026-08-12&lat=41.81670&lon=-3.18500",
+    "/browse/?eclipse=solar-2026-08-12-total&year=2026&locator=place&around=2026-08-12&lat=41.81670&lon=-3.18500",
   );
   await expect(page.getByLabel("Around date")).toHaveValue("2026-08-12");
   await expect(page.locator("[data-local-peak]")).toHaveCount(11);
@@ -319,7 +319,7 @@ test("retains each locator timeline while switching modes", async ({
   page,
 }) => {
   await page.goto(
-    "/?eclipse=solar-2026-08-12-total&year=2026&locator=place&around=2026-08-12&lat=41.81670&lon=-3.18500",
+    "/browse/?eclipse=solar-2026-08-12-total&year=2026&locator=place&around=2026-08-12&lat=41.81670&lon=-3.18500",
   );
   await expect(page.locator("[data-local-peak]")).toHaveCount(11);
   const placePeaks = await page
@@ -376,7 +376,7 @@ test("refreshes place discovery after changing the map location in date mode", a
   page,
 }) => {
   await page.goto(
-    "/?eclipse=solar-2026-08-12-total&year=2026&locator=place&around=2026-08-12&lat=41.81670&lon=-3.18500",
+    "/browse/?eclipse=solar-2026-08-12-total&year=2026&locator=place&around=2026-08-12&lat=41.81670&lon=-3.18500",
   );
   await expect(page.locator("[data-local-peak]")).toHaveCount(11);
   const originalPeaks = await page
@@ -404,7 +404,7 @@ test("refreshes place discovery after changing the map location in date mode", a
 });
 
 test("calculates shadows by clicking an eclipse overlay", async ({ page }) => {
-  await page.goto("/?eclipse=solar-2026-08-12-total");
+  await page.goto("/browse/?eclipse=solar-2026-08-12-total");
   await expectRenderedFeatures(page.locator("#mercator-map"));
   await expect(page).toHaveURL(/#map=\d+\//);
 
@@ -453,7 +453,7 @@ test("calculates shadows by clicking an eclipse overlay", async ({ page }) => {
 test("selects one synchronized observer from every projection", async ({
   page,
 }) => {
-  await page.goto("/?eclipse=solar-2026-08-12-total");
+  await page.goto("/browse/?eclipse=solar-2026-08-12-total");
   await expectRenderedFeatures(page.locator("#mercator-map"));
 
   for (const id of ["mercator-map", "globe-map", "world-map"]) {
@@ -487,7 +487,7 @@ test("renders and round-trips a selected location at the pole", async ({
   page,
 }) => {
   await page.goto(
-    "/?eclipse=solar-2026-08-12-total&lat=89.90000&lon=0.00000",
+    "/browse/?eclipse=solar-2026-08-12-total&lat=89.90000&lon=0.00000",
   );
   await expectRenderedFeatures(page.locator("#globe-map"));
 
@@ -574,7 +574,7 @@ test("renders and round-trips a selected location at the pole", async ({
 });
 
 test("applies one layer toggle to all renderers", async ({ page }) => {
-  await page.goto("/?eclipse=solar-2026-08-12-total");
+  await page.goto("/browse/?eclipse=solar-2026-08-12-total");
   await expectRenderedFeatures(page.locator("#mercator-map"));
 
   await page.getByLabel("Central path", { exact: true }).uncheck();
@@ -589,7 +589,7 @@ test("applies one layer toggle to all renderers", async ({ page }) => {
 test("keeps the equirectangular whole-Earth camera fixed", async ({
   page,
 }) => {
-  await page.goto("/?eclipse=solar-2026-08-12-total");
+  await page.goto("/browse/?eclipse=solar-2026-08-12-total");
   const world = page.locator("#world-map");
   await expectRenderedFeatures(world);
   await expect(world.locator(".leaflet-control-zoom")).toHaveCount(0);
@@ -622,7 +622,7 @@ test("keeps Leaflet maps usable when WebGL is unavailable", async ({
       return Reflect.apply(original, this, [contextId, ...args]);
     } as typeof HTMLCanvasElement.prototype.getContext;
   });
-  await page.goto("/?eclipse=solar-2026-08-12-total");
+  await page.goto("/browse/?eclipse=solar-2026-08-12-total");
   await expect(page.locator("#globe-map")).toHaveAttribute(
     "data-renderer-ready",
     "false",
@@ -634,7 +634,7 @@ test("keeps Leaflet maps usable when WebGL is unavailable", async ({
 test("downloads deterministic browser-generated GIS files", async ({
   page,
 }) => {
-  await page.goto("/?eclipse=solar-2026-08-12-total");
+  await page.goto("/browse/?eclipse=solar-2026-08-12-total");
   await expectRenderedFeatures(page.locator("#mercator-map"));
   const geoJsonButton = page.getByRole("button", { name: "Download GeoJSON" });
   const downloadPromise = page.waitForEvent("download");
@@ -648,7 +648,7 @@ test("downloads deterministic browser-generated GIS files", async ({
 test("renders both 2027 central tracks through horizon singularities", async ({
   page,
 }) => {
-  await page.goto("/?eclipse=solar-2027-02-06-annular&year=2027");
+  await page.goto("/browse/?eclipse=solar-2027-02-06-annular&year=2027");
   await expectRenderedFeatures(page.locator("#mercator-map"));
   await page.locator('[data-event-id="solar-2027-08-02-total"]').click();
   await expect(page).toHaveURL(/eclipse=solar-2027-08-02-total/);
@@ -658,7 +658,7 @@ test("renders both 2027 central tracks through horizon singularities", async ({
 test("fits antimeridian tracks in one continuous Leaflet world", async ({
   page,
 }) => {
-  await page.goto("/?eclipse=solar-2016-03-09-total&year=2016");
+  await page.goto("/browse/?eclipse=solar-2016-03-09-total&year=2016");
   await expectRenderedFeatures(page.locator("#mercator-map"));
   await expect
     .poll(() => Number(new URL(page.url()).hash.split("/")[2]))
@@ -670,7 +670,7 @@ test("fits antimeridian tracks in one continuous Leaflet world", async ({
 
 test("stacks the projection panels on a narrow screen", async ({ page }) => {
   await page.setViewportSize({ width: 640, height: 900 });
-  await page.goto("/?eclipse=solar-2026-08-12-total");
+  await page.goto("/browse/?eclipse=solar-2026-08-12-total");
   await expectRenderedFeatures(page.locator("#globe-map"));
   const mercator = await page.locator(".mercator-panel").boundingBox();
   const globe = await page.locator(".globe-panel").boundingBox();
