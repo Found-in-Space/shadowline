@@ -318,6 +318,31 @@ test("prefills manual location with valid, appropriately rounded GPS values", as
   ).toBe(true);
 });
 
+test("splits a pasted Google Maps coordinate pair across the manual inputs", async ({
+  page,
+}) => {
+  await page.goto("/tracker/202608/");
+  await page.getByRole("button", { name: "Enter a location" }).click();
+
+  await page.locator("#latitude-input").evaluate((input) => {
+    const clipboardData = new DataTransfer();
+    clipboardData.setData(
+      "text/plain",
+      "52.17165814560727, 4.481946799114639",
+    );
+    input.dispatchEvent(
+      new ClipboardEvent("paste", { bubbles: true, clipboardData }),
+    );
+  });
+
+  await expect(page.locator("#latitude-input")).toHaveValue(
+    "52.17165814560727",
+  );
+  await expect(page.locator("#longitude-input")).toHaveValue(
+    "4.481946799114639",
+  );
+});
+
 test("marks the solar preview when the Sun is below the horizon", async ({
   page,
 }) => {
