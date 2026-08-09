@@ -23,7 +23,7 @@ test("requests Blue Marble from the cacheable GIBS WMTS service", async ({
     }
   });
 
-  await page.goto("/?eclipse=solar-2026-08-12-total");
+  await page.goto("/browse/?eclipse=solar-2026-08-12-total");
   await expect(page.locator("#world-map")).toHaveAttribute(
     "data-renderer-ready",
     "true",
@@ -49,7 +49,7 @@ test("requests Blue Marble from the cacheable GIBS WMTS service", async ({
 });
 
 test("initializes four coordinated visual panels", async ({ page }) => {
-  await page.goto("/?eclipse=solar-2026-08-12-total");
+  await page.goto("/browse/?eclipse=solar-2026-08-12-total");
 
   await expect(
     page.getByRole("article", { name: "OpenStreetMap · Web Mercator" }),
@@ -94,7 +94,7 @@ test("lets every map fill its projection panel edge to edge", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
-  await page.goto("/?eclipse=solar-2026-08-12-total");
+  await page.goto("/browse/?eclipse=solar-2026-08-12-total");
   await expect(
     page.getByText("track calculated from", { exact: false }),
   ).toBeVisible();
@@ -152,7 +152,7 @@ test("keeps polar Web Mercator fits inside the projected world", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
-  await page.goto("/?eclipse=solar-2026-08-12-total");
+  await page.goto("/browse/?eclipse=solar-2026-08-12-total");
   await expect(
     page.getByText("track calculated from", { exact: false }),
   ).toBeVisible();
@@ -192,7 +192,7 @@ test("searches a year and calculates the complete 2026 path", async ({
       catalogueRequests.push(request.url());
     }
   });
-  await page.goto("/");
+  await page.goto("/browse/");
   await expect(page.getByRole("heading", { name: "Shadowline" })).toBeVisible();
   await expect(
     page.getByText("track calculated from", { exact: false }),
@@ -261,7 +261,7 @@ test("searches a year and calculates the complete 2026 path", async ({
 test("keeps discovery results stable when selecting an eclipse", async ({
   page,
 }) => {
-  await page.goto("/");
+  await page.goto("/browse/");
   await expect(
     page.getByText("track calculated from", { exact: false }),
   ).toBeVisible();
@@ -293,7 +293,7 @@ test("keeps discovery results stable when selecting an eclipse", async ({
 test("keeps the newest event search when an older search finishes later", async ({
   page,
 }) => {
-  await page.goto("/");
+  await page.goto("/browse/");
   await expect(
     page.getByText("track calculated from", { exact: false }),
   ).toBeVisible();
@@ -312,7 +312,7 @@ test("keeps the newest event search when an older search finishes later", async 
 test("renders global visibility for a partial-only eclipse", async ({
   page,
 }) => {
-  await page.goto("/?eclipse=solar-2025-03-29-partial&year=2025");
+  await page.goto("/browse/?eclipse=solar-2025-03-29-partial&year=2025");
   await expect(
     page.getByText("Partial-eclipse visibility calculated", {
       exact: false,
@@ -325,7 +325,7 @@ test("renders global visibility for a partial-only eclipse", async ({
 
 test("restores a selected place from shareable state", async ({ page }) => {
   await page.goto(
-    "/?eclipse=solar-2026-08-12-total&lat=41.81670&lon=-3.18500",
+    "/browse/?eclipse=solar-2026-08-12-total&lat=41.81670&lon=-3.18500",
   );
   await expect(page.getByText("Total at this point")).toBeVisible();
   await expect(
@@ -356,7 +356,7 @@ test("restores and pages one chronological place timeline", async ({
   page,
 }) => {
   await page.goto(
-    "/?eclipse=solar-2026-08-12-total&year=2026&locator=place&around=2026-08-12&lat=41.81670&lon=-3.18500",
+    "/browse/?eclipse=solar-2026-08-12-total&year=2026&locator=place&around=2026-08-12&lat=41.81670&lon=-3.18500",
   );
   await expect(page.getByText("Total at this point")).toBeVisible();
   await expect(page.getByRole("tab", { name: "By place" })).toHaveAttribute(
@@ -414,7 +414,7 @@ test("retains each locator timeline while switching modes", async ({
   page,
 }) => {
   await page.goto(
-    "/?eclipse=solar-2026-08-12-total&year=2026&locator=place&around=2026-08-12&lat=41.81670&lon=-3.18500",
+    "/browse/?eclipse=solar-2026-08-12-total&year=2026&locator=place&around=2026-08-12&lat=41.81670&lon=-3.18500",
   );
   await expect(page.locator("[data-local-peak]")).toHaveCount(11);
   const placePeaks = await page
@@ -467,7 +467,7 @@ test("refreshes place discovery after changing the map location in date mode", a
   page,
 }) => {
   await page.goto(
-    "/?eclipse=solar-2026-08-12-total&year=2026&locator=place&around=2026-08-12&lat=41.81670&lon=-3.18500",
+    "/browse/?eclipse=solar-2026-08-12-total&year=2026&locator=place&around=2026-08-12&lat=41.81670&lon=-3.18500",
   );
   await expect(page.locator("[data-local-peak]")).toHaveCount(11);
   const originalPeaks = await page
@@ -497,7 +497,7 @@ test("refreshes place discovery after changing the map location in date mode", a
 test("uses the maps as the place picker while keeping date discovery active", async ({
   page,
 }) => {
-  await page.goto("/?eclipse=solar-2026-08-12-total");
+  await page.goto("/browse/?eclipse=solar-2026-08-12-total");
   await expect(
     page.getByText("track calculated from", { exact: false }),
   ).toBeVisible();
@@ -515,7 +515,7 @@ test("uses the maps as the place picker while keeping date discovery active", as
 });
 
 test("calculates shadows by clicking an eclipse overlay", async ({ page }) => {
-  await page.goto("/?eclipse=solar-2026-08-12-total");
+  await page.goto("/browse/?eclipse=solar-2026-08-12-total");
   await expect(
     page.getByText("track calculated from", { exact: false }),
   ).toBeVisible();
@@ -566,7 +566,7 @@ test("calculates shadows by clicking an eclipse overlay", async ({ page }) => {
 test("selects one synchronized observer from every projection", async ({
   page,
 }) => {
-  await page.goto("/?eclipse=solar-2026-08-12-total");
+  await page.goto("/browse/?eclipse=solar-2026-08-12-total");
   await expect(
     page.getByText("track calculated from", { exact: false }),
   ).toBeVisible();
@@ -602,7 +602,7 @@ test("renders and round-trips a selected location at the pole", async ({
   page,
 }) => {
   await page.goto(
-    "/?eclipse=solar-2026-08-12-total&lat=89.90000&lon=0.00000",
+    "/browse/?eclipse=solar-2026-08-12-total&lat=89.90000&lon=0.00000",
   );
   await expect(
     page.getByText("track calculated from", { exact: false }),
@@ -691,7 +691,7 @@ test("renders and round-trips a selected location at the pole", async ({
 });
 
 test("applies one layer toggle to all renderers", async ({ page }) => {
-  await page.goto("/?eclipse=solar-2026-08-12-total");
+  await page.goto("/browse/?eclipse=solar-2026-08-12-total");
   await expect(
     page.getByText("track calculated from", { exact: false }),
   ).toBeVisible();
@@ -708,7 +708,7 @@ test("applies one layer toggle to all renderers", async ({ page }) => {
 test("keeps the equirectangular whole-Earth camera fixed", async ({
   page,
 }) => {
-  await page.goto("/?eclipse=solar-2026-08-12-total");
+  await page.goto("/browse/?eclipse=solar-2026-08-12-total");
   await expect(
     page.getByText("track calculated from", { exact: false }),
   ).toBeVisible();
@@ -743,7 +743,7 @@ test("keeps Leaflet maps usable when WebGL is unavailable", async ({
       return Reflect.apply(original, this, [contextId, ...args]);
     } as typeof HTMLCanvasElement.prototype.getContext;
   });
-  await page.goto("/?eclipse=solar-2026-08-12-total");
+  await page.goto("/browse/?eclipse=solar-2026-08-12-total");
   await expect(
     page.locator("#globe-map").getByText("globe is unavailable", {
       exact: false,
@@ -762,7 +762,7 @@ test("keeps Leaflet maps usable when WebGL is unavailable", async ({
 test("downloads deterministic browser-generated GIS files", async ({
   page,
 }) => {
-  await page.goto("/?eclipse=solar-2026-08-12-total");
+  await page.goto("/browse/?eclipse=solar-2026-08-12-total");
   const geoJsonButton = page.getByRole("button", { name: "Download GeoJSON" });
   await expect(geoJsonButton).toBeEnabled();
   const downloadPromise = page.waitForEvent("download");
@@ -776,7 +776,7 @@ test("downloads deterministic browser-generated GIS files", async ({
 test("renders both 2027 central tracks through horizon singularities", async ({
   page,
 }) => {
-  await page.goto("/?eclipse=solar-2027-02-06-annular&year=2027");
+  await page.goto("/browse/?eclipse=solar-2027-02-06-annular&year=2027");
   await expect(
     page.getByText("Annular track calculated from", { exact: false }),
   ).toBeVisible();
@@ -789,7 +789,7 @@ test("renders both 2027 central tracks through horizon singularities", async ({
 test("fits antimeridian tracks in one continuous Leaflet world", async ({
   page,
 }) => {
-  await page.goto("/?eclipse=solar-2016-03-09-total&year=2016");
+  await page.goto("/browse/?eclipse=solar-2016-03-09-total&year=2016");
   await expect(
     page.getByText("Total track calculated from", { exact: false }),
   ).toBeVisible();
@@ -803,7 +803,7 @@ test("fits antimeridian tracks in one continuous Leaflet world", async ({
 
 test("stacks the projection panels on a narrow screen", async ({ page }) => {
   await page.setViewportSize({ width: 640, height: 900 });
-  await page.goto("/?eclipse=solar-2026-08-12-total");
+  await page.goto("/browse/?eclipse=solar-2026-08-12-total");
   await expect(page.locator("#globe-map")).toHaveAttribute(
     "data-renderer-ready",
     "true",

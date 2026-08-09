@@ -3,6 +3,9 @@ import worker from "../apps/visualizer/src/sites-worker.mjs";
 
 describe("Sites static worker routing", () => {
   it.each([
+    ["/browse", "/browse/"],
+    ["/deployment/prefix/browse", "/deployment/prefix/browse/"],
+    ["/spacefarer", "/spacefarer/"],
     ["/tracker/202608", "/tracker/202608/"],
     ["/deployment/prefix/tracker/202608", "/deployment/prefix/tracker/202608/"],
   ])("preserves prefixes when redirecting %s", async (path, expected) => {

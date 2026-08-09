@@ -5,138 +5,258 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta
       name="description"
-      content="Explore solar eclipses, calculate local circumstances, and download complete GIS tracks."
+      content="Shadowline turns open astronomical models into explorable solar-eclipse maps, a location-aware 2026 tracker, and reusable open-source code."
     >
-    <meta name="theme-color" content="#171521">
-    <title>Shadowline — foundin.space</title>
+    <meta property="og:type" content="website">
+    <meta property="og:title" content="Shadowline — See the shadow. Look behind the prediction.">
+    <meta property="og:description" content="Explore solar eclipses, follow the 12 August 2026 shadow, and see the model and open code behind each view.">
+    <meta property="og:image" content="./og-shadowline.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="Shadowline eclipse path crossing Earth beside the words See the shadow. Then look behind the prediction.">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Shadowline — Found in Space">
+    <meta name="twitter:description" content="Explore solar eclipses and look behind the predictions.">
+    <meta name="twitter:image" content="./og-shadowline.png">
+    <meta name="twitter:image:alt" content="Shadowline eclipse path crossing Earth beside the words See the shadow. Then look behind the prediction.">
+    <meta name="theme-color" content="#07111f">
+    <link rel="icon" href="./tracker/202608/favicon.ico" sizes="32x32">
+    <link rel="icon" href="./tracker/202608/icon.svg" type="image/svg+xml">
+    <title>Shadowline — Found in Space</title>
+    <link rel="stylesheet" href="/src/landing.css">
   </head>
   <body>
-    <a class="skip-link" href="#mercator-map">Skip to the eclipse maps</a>
-    <main class="app-shell">
-      <aside class="sidebar" id="sidebar" aria-label="Eclipse explorer">
-        <header class="brand">
-          <button id="sidebar-close" class="sidebar-close" type="button" aria-label="Close eclipse explorer">×</button>
-          <p class="eyebrow">foundin.space</p>
-          <h1>Shadowline</h1>
-          <p>Planning-grade solar eclipse paths, local circumstances, and portable GIS data.</p>
-        </header>
+    <a class="skip-link" href="#main-content">Skip to Shadowline</a>
 
-        <section class="panel-section search-section" aria-labelledby="search-heading">
-          <h2 id="search-heading">Find an eclipse</h2>
-          <div class="locator-tabs" role="tablist" aria-label="Eclipse locator">
-            <button id="date-tab" type="button" role="tab" aria-selected="true" aria-controls="date-controls">By date</button>
-            <button id="place-tab" type="button" role="tab" aria-selected="false" aria-controls="place-controls" tabindex="-1">By place</button>
+    <header class="site-header">
+      <a class="wordmark" href="https://foundin.space/" aria-label="Found in Space home">
+        <span class="wordmark-mark" aria-hidden="true"><i></i></span>
+        <span>
+          <strong>Found in Space</strong>
+          <small>Shadowline</small>
+        </span>
+      </a>
+      <nav aria-label="Primary">
+        <a href="#how-it-works">How it works</a>
+        <a href="#build-with-it">Build with it</a>
+        <a href="https://foundin.space/">The wider project</a>
+      </nav>
+    </header>
+
+    <main id="main-content">
+      <section class="hero">
+        <div class="hero-copy">
+          <p class="eyebrow">Open eclipse maps · local predictions · reusable code</p>
+          <h1>See the shadow. <span>Then look behind the prediction.</span></h1>
+          <p class="lede">
+            Shadowline turns the predicted motion of the Sun and Moon into an
+            explorable model of a solar eclipse. Follow the shadow across Earth,
+            check what happens at a place, and see what the calculation can—and
+            cannot—tell us. Then use the open code behind the view to make an
+            eclipse visualisation of your own.
+          </p>
+          <div class="hero-actions" aria-label="Explore Shadowline">
+            <a class="button button-primary" href="./browse/">
+              Browse solar eclipses <span aria-hidden="true">↗</span>
+            </a>
+            <a class="button button-secondary" href="./tracker/202608/">
+              Open the 2026 tracker <span aria-hidden="true">→</span>
+            </a>
           </div>
-          <div id="date-controls" class="locator-panel" role="tabpanel" aria-labelledby="date-tab">
-            <form id="year-form" class="year-form">
-              <label for="year-input">Calendar year</label>
-              <div class="input-action">
-                <input id="year-input" name="year" type="number" step="1" required>
-                <button type="submit">Search</button>
-              </div>
-            </form>
+          <ul class="hero-facts" aria-label="Shadowline features">
+            <li>Calculated in your browser</li>
+            <li>Projection-neutral WGS 84 geometry</li>
+            <li>Open-source packages and GIS exports</li>
+          </ul>
+        </div>
+
+        <figure class="eclipse-figure" role="img" aria-label="The Moon’s shadow crossing a view of Earth">
+          <div class="sun-glow" aria-hidden="true"></div>
+          <div class="orbit orbit-far" aria-hidden="true"></div>
+          <div class="orbit orbit-near" aria-hidden="true"></div>
+          <div class="earth" aria-hidden="true">
+            <span class="earth-night"></span>
+            <span class="shadow-track"></span>
+            <span class="shadow-point"></span>
           </div>
-          <div id="place-controls" class="locator-panel" role="tabpanel" aria-labelledby="place-tab" hidden>
-            <div id="locator-place" class="place-coordinate locator-place">
-              <span>Selected point</span>
-              <strong>Choose a point on a map</strong>
+          <div class="moon" aria-hidden="true"></div>
+          <figcaption>
+            <span>12 August 2026</span>
+            <strong>The Moon’s shadow crosses the North Atlantic</strong>
+          </figcaption>
+        </figure>
+      </section>
+
+      <section class="routes" aria-labelledby="choose-heading">
+        <div class="section-intro">
+          <p class="eyebrow">From model to visualisation</p>
+          <h2 id="choose-heading">One open model. Many ways to make it meaningful.</h2>
+          <p>
+            These are two examples, not two limits. The explorer compares eclipses
+            across dates, places and projections. The 2026 tracker reshapes the same
+            underlying geometry around one event, one observer and one day.
+          </p>
+        </div>
+        <div class="route-grid">
+          <a class="route-card route-card-explorer" href="./browse/">
+            <div class="route-number" aria-hidden="true">01</div>
+            <p class="card-label">General-purpose explorer</p>
+            <h3>Browse solar eclipses</h3>
+            <p>
+              Find eclipses by year or place, compare the same path on a flat map,
+              a globe, a whole-Earth view and local terrain, then download the
+              complete geometry as GeoJSON or KML.
+            </p>
+            <ul>
+              <li>Any year or selected location</li>
+              <li>Four coordinated views</li>
+              <li>Portable planning data</li>
+            </ul>
+            <span class="card-cta">Open the eclipse explorer <i aria-hidden="true">↗</i></span>
+          </a>
+
+          <a class="route-card route-card-tracker" href="./tracker/202608/">
+            <div class="route-number" aria-hidden="true">02</div>
+            <p class="card-label">Focused field application · 12 August 2026</p>
+            <h3>Take the tracker with you</h3>
+            <p>
+              Use your location to see local eclipse times, preview the Sun, and
+              follow the moving shadow. Load it before you set out and it can keep
+              calculating if your signal drops.
+            </p>
+            <ul>
+              <li>Location-aware contact times</li>
+              <li>Live and manual time preview</li>
+              <li>Designed for a poor connection</li>
+            </ul>
+            <span class="card-cta">Open the 2026 tracker <i aria-hidden="true">→</i></span>
+          </a>
+        </div>
+      </section>
+
+      <section id="how-it-works" class="method" aria-labelledby="method-heading">
+        <div class="method-heading">
+          <p class="eyebrow">How Shadowline works</p>
+          <h2 id="method-heading">Build the model once. Ask many questions of it.</h2>
+        </div>
+        <ol class="method-steps">
+          <li>
+            <span>01</span>
+            <div>
+              <h3>Start with a celestial model</h3>
+              <p>
+                Astronomy Engine supplies predicted Sun and Moon positions. Shadowline
+                transforms them into a rotating, Earth-fixed frame.
+              </p>
             </div>
-            <form id="place-form">
-              <label for="around-input">Around date</label>
-              <div class="input-action">
-                <input id="around-input" name="around" type="date" required>
-                <button type="submit">Search</button>
-              </div>
-            </form>
-            <p class="field-help">Click any map to choose or change the place.</p>
+          </li>
+          <li>
+            <span>02</span>
+            <div>
+              <h3>Calculate the physical geometry</h3>
+              <p>
+                The shadow cone is intersected with the WGS 84 shape of Earth. The
+                complete path stays independent of any particular map projection.
+              </p>
+            </div>
+          </li>
+          <li>
+            <span>03</span>
+            <div>
+              <h3>Shape a view around a real question</h3>
+              <p>
+                The explorer, ground view and 2026 tracker each select and present
+                the shared geometry differently. A new application can ask something
+                else without having to rebuild the eclipse science.
+              </p>
+            </div>
+          </li>
+        </ol>
+        <aside class="limits-note">
+          <p class="card-label">Keep the limits visible</p>
+          <p>
+            These are centre-of-figure predictions for planning and exploration,
+            not observations. The real lunar edge, terrain, weather, nearby
+            obstructions and the accuracy of your location can all affect what you
+            actually see.
+          </p>
+        </aside>
+      </section>
+
+      <section id="build-with-it" class="principles" aria-labelledby="principles-heading">
+        <div class="principles-copy">
+          <p class="eyebrow">Part of Found in Space</p>
+          <h2 id="principles-heading">See it. Question it. Build with it.</h2>
+          <p>
+            Found in Space turns open scientific measurements and models into
+            interactive experiences, while keeping the sources, assumptions and
+            limitations in view. A compelling picture should invite the next
+            question: what is this made from, what does it leave out, and what can
+            I make with the material behind it?
+          </p>
+          <p>
+            Shadowline is not only something to use. It is a public, package-first
+            codebase: renderer-independent geometry, an astronomy adapter, GIS
+            exporters and working example applications. Use one piece, replace a
+            renderer, make a classroom activity, or take the model somewhere the
+            current site does not go.
+          </p>
+          <div class="builder-callout">
+            <p class="card-label">Start building</p>
+            <h3>Use the eclipse engine, not just the website.</h3>
+            <p>
+              Install the geometry package and its Astronomy Engine provider, then
+              calculate a path, local circumstances or GIS export inside your own
+              JavaScript or TypeScript project.
+            </p>
+            <code class="install-command">npm install @found-in-space/shadowline @found-in-space/shadowline-astronomy-engine</code>
+            <div class="text-links">
+              <a href="https://github.com/Found-in-Space/shadowline#package-api">Open the package guide <span aria-hidden="true">↗</span></a>
+              <a href="https://github.com/Found-in-Space/shadowline/issues">Suggest an idea or contribute <span aria-hidden="true">↗</span></a>
+            </div>
           </div>
-          <p id="timeline-heading" class="event-list-heading"></p>
-          <button id="load-earlier-button" class="timeline-page-button" type="button" disabled>Show 5 earlier eclipses</button>
-          <div id="event-list" class="event-list" aria-live="polite"></div>
-          <button id="load-later-button" class="timeline-page-button" type="button" disabled>Show 5 later eclipses</button>
-          <div id="discovery-status" class="discovery-status" role="status" aria-live="polite"></div>
-        </section>
-
-        <section class="panel-section selected-section" aria-labelledby="selected-heading">
-          <h2 id="selected-heading">Eclipse details</h2>
-          <div id="event-summary" class="event-summary">
-            <p>Finding the next solar eclipse…</p>
+          <div class="text-links project-links">
+            <a href="https://foundin.space/">Explore Found in Space <span aria-hidden="true">↗</span></a>
+            <a href="https://github.com/Found-in-Space/shadowline">Read the source <span aria-hidden="true">↗</span></a>
           </div>
-          <div id="calculation-status" class="status-line" role="status" aria-live="polite"></div>
-          <div class="action-grid">
-            <button id="fit-button" class="secondary-button" type="button" disabled>Fit complete track</button>
-            <button id="geojson-button" class="secondary-button" type="button" disabled>Download GeoJSON</button>
-            <button id="kml-button" class="secondary-button" type="button" disabled>Download KML</button>
-          </div>
-        </section>
-
-        <section class="panel-section location-section" aria-labelledby="location-heading">
-          <h2 id="location-heading">At selected place</h2>
-          <div id="location-results" class="location-results" aria-live="polite">
-            <p class="location-prompt">Click any map to see local circumstances for the selected eclipse.</p>
-          </div>
-        </section>
-
-        <details class="panel-section layer-section" open>
-          <summary>Map layers</summary>
-          <p class="field-help">Show or hide overlays on all three maps.</p>
-          <div class="layer-toggles">
-            <label><input type="checkbox" data-layer-key="centralPath" checked><i class="path-swatch"></i><span>Central path</span></label>
-            <label><input type="checkbox" data-layer-key="partialExtent" checked><i class="extent-swatch"></i><span>Partial-eclipse extent</span></label>
-            <label><input type="checkbox" data-layer-key="horizonLimits" checked><i class="horizon-swatch"></i><span>Sunrise / sunset limits</span></label>
-            <label><input type="checkbox" data-layer-key="contacts" checked><i class="contact-swatch"></i><span>P1–P4 contacts</span></label>
-            <label><input type="checkbox" data-layer-key="localPenumbra" checked><i class="penumbra-swatch"></i><span>Penumbra at local maximum</span></label>
-            <label><input type="checkbox" data-layer-key="localCentralShadow" checked><i class="umbra-swatch"></i><span>Umbra / antumbra at local maximum</span></label>
-            <label><input type="checkbox" data-layer-key="centerAndLimits" checked><i class="centre-swatch"></i><span>Centre and limits</span></label>
-            <label><input type="checkbox" data-layer-key="timeMarkers" checked><i class="marker-swatch"></i><span>Time markers</span></label>
-          </div>
-        </details>
-
-        <details class="panel-section methodology">
-          <summary>Model, accuracy, and reuse</summary>
-          <p>The maps are calculated in your browser from Astronomy Engine Sun/Moon vectors and a projection-neutral, Earth-fixed WGS 84 shadow-cone solver.</p>
-          <p>The downloadable GeoJSON retains the complete track. Only the Web Mercator planning view is clipped at its projection limit.</p>
-          <p>Results are centre-of-figure and planning-grade. Lunar terrain can move the observed limit by kilometres.</p>
-        </details>
-
-        <footer>
-          <p>Map data © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>. Whole-Earth imagery from <a href="https://earthdata.nasa.gov/gibs">NASA GIBS</a>.</p>
-          <p>Astronomy calculations © Don Cross, MIT. <a href="./THIRD_PARTY_LICENSES.txt">Third-party licences</a>.</p>
-        </footer>
-      </aside>
-
-      <section class="map-shell" aria-label="Eclipse projection comparison">
-        <div class="map-grid">
-          <article class="map-panel mercator-panel" aria-labelledby="mercator-heading">
-            <h2 class="map-panel-label" id="mercator-heading">OpenStreetMap · Web Mercator</h2>
-            <div id="mercator-map" class="map-viewport" tabindex="0" data-projection="mercator"></div>
+        </div>
+        <div class="principle-grid" aria-label="Found in Space principles">
+          <article>
+            <span aria-hidden="true">◉</span>
+            <h3>See it</h3>
+            <p>Start with a view you can explore, not a diagram you have to take on trust.</p>
           </article>
-          <article class="map-panel globe-panel" aria-labelledby="globe-heading">
-            <h2 class="map-panel-label" id="globe-heading">OpenStreetMap · 3D globe</h2>
-            <div id="globe-map" class="map-viewport" tabindex="0" data-projection="globe"></div>
+          <article>
+            <span aria-hidden="true">?</span>
+            <h3>Question it</h3>
+            <p>Keep evidence, transformations, assumptions and uncertainty close to the result.</p>
           </article>
-          <article class="map-panel world-panel" aria-labelledby="world-heading">
-            <h2 class="map-panel-label" id="world-heading">NASA Blue Marble · Equirectangular</h2>
-            <div id="world-map" class="map-viewport" tabindex="0" data-projection="equirectangular"></div>
-          </article>
-          <article class="map-panel ground-panel" aria-labelledby="ground-heading">
-            <h2 class="map-panel-label" id="ground-heading">Terrain · Ground view</h2>
-            <div id="ground-map" class="map-viewport ground-viewport" tabindex="0" data-projection="ground"></div>
-            <p id="ground-status" class="ground-status" role="status" aria-live="polite">Choose a point on any map to prepare the view from the ground.</p>
+          <article>
+            <span aria-hidden="true">↗</span>
+            <h3>Build with it</h3>
+            <p>Install the packages, fork a working example, or contribute the next useful way to see the model.</p>
           </article>
         </div>
-        <button
-          id="sidebar-toggle"
-          class="sidebar-toggle"
-          type="button"
-          aria-controls="sidebar"
-          aria-expanded="false"
-        >Eclipse explorer</button>
+      </section>
+
+      <section class="closing" aria-labelledby="closing-heading">
+        <p class="eyebrow">Ready to take it further?</p>
+        <h2 id="closing-heading">Explore a view—or make the next one.</h2>
+        <div class="hero-actions">
+          <a class="button button-primary" href="./browse/">Browse solar eclipses <span aria-hidden="true">↗</span></a>
+          <a class="button button-secondary" href="./tracker/202608/">Open the 2026 tracker <span aria-hidden="true">→</span></a>
+          <a class="button button-secondary" href="https://github.com/Found-in-Space/shadowline#package-api">Build with the code <span aria-hidden="true">↗</span></a>
+        </div>
       </section>
     </main>
+
+    <footer class="site-footer">
+      <p><strong>Shadowline</strong> is an open <a href="https://foundin.space/">Found in Space</a> project by <a href="https://www.k-si.com/">Kaj Siebert</a>.</p>
+      <p>Earth imagery: <a href="https://earthdata.nasa.gov/">NASA Earthdata</a>. Astronomy calculations: <a href="https://github.com/cosinekitty/astronomy">Don Cross</a>, MIT.</p>
+    </footer>
+
     <!-- 100% privacy-first analytics -->
     <script data-collect-dnt="true" async src="https://scripts.simpleanalyticscdn.com/latest.js"></script>
     <noscript><img src="https://queue.simpleanalyticscdn.com/noscript.gif?collect-dnt=true" alt="" referrerpolicy="no-referrer-when-downgrade"></noscript>
-    <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
