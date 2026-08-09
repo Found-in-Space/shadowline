@@ -1,0 +1,51 @@
+name: Release packages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  id-token: write
+  pull-requests: write
+
+concurrency:
+  group: release-packages
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          registry-url: "https://registry.npmjs.org"
+
+      - run: npm ci
+      - run: npm run check
+      - run: npm test
+      - run: npm run test:validation
+      - run: npm run build
+      - run: npm run release:check-packed-consumers
+      - name: Install Chromium for browser tests
+        run: npx playwright install --with-deps chromium
+      - run: npm run test:browser
+      - name: Check pushed patches for whitespace errors
+        if: github.event_name == 'push'
+        run: git log --check --oneline "${{ github.event.before }}..${{ github.sha }}"
+      - name: Check the dispatched commit for whitespace errors
+        if: github.event_name == 'workflow_dispatch'
+        run: git log -1 --check --oneline
+
+      - uses: changesets/action@v1
+        with:
+          version: npm run release:version
+          publish: npm run release:publish
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

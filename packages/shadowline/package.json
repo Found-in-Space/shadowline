@@ -1,12 +1,12 @@
 {
   "name": "@found-in-space/shadowline",
-  "version": "0.2.0",
+  "version": "0.1.0-alpha.0",
   "description": "Renderer-independent eclipse geometry and portable GIS exporters for Found in Space",
   "type": "module",
   "homepage": "https://github.com/Found-in-Space/shadowline/tree/main/packages/shadowline#readme",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Found-in-Space/shadowline",
+    "url": "git+https://github.com/Found-in-Space/shadowline.git",
     "directory": "packages/shadowline"
   },
   "bugs": {
@@ -27,6 +27,7 @@
     "dist/**/*.d.ts.map",
     "src",
     "examples",
+    "CHANGELOG.md",
     "README.md"
   ],
   "scripts": {
@@ -37,6 +38,7 @@
   },
   "license": "MIT",
   "publishConfig": {
-    "access": "public"
+    "access": "public",
+    "tag": "alpha"
   }
 }

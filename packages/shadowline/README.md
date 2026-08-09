@@ -1,6 +1,10 @@
 # @found-in-space/shadowline
 
-Status: current 0.2 package.
+> [!WARNING]
+> **Very early alpha.** This package is available as `0.1.0-alpha.0` under npm's
+> `alpha` dist-tag. Its API, scene model, serialization schema, and numerical
+> behaviour are likely to change, potentially without a migration path. The
+> examples describe the current alpha, not a stable library.
 
 Dependency-free, renderer-independent solar-eclipse geometry for Found in Space
 applications, browser maps, and back ends.
@@ -9,17 +13,23 @@ The package turns Earth-fixed Sun and Moon state vectors into physical eclipse
 scenes. It does not depend on Astronomy Engine, Leaflet, MapLibre, Three.js, a
 DOM, or a map projection.
 
-## Install
+## Install the alpha
+
+Install both the geometry package and the Astronomy Engine capability provider:
 
 ```bash
-npm install @found-in-space/shadowline \
-  @found-in-space/shadowline-astronomy-engine
+npm install @found-in-space/shadowline@alpha \
+  @found-in-space/shadowline-astronomy-engine@alpha
 ```
 
-The Astronomy Engine adapter is optional. Applications can provide any
-`EarthFixedEphemeris` implementation instead.
+The Astronomy Engine adapter is optional; applications can instead pass their
+own `EarthFixedEphemeris` in an `EclipseCapabilities` object. Keep the explicit
+`@alpha` tag until a stable release is available.
 
 ## Minimal scene
+
+This example matches the current alpha API and works after installing the two
+packages above.
 
 ```ts
 import {
@@ -53,7 +63,7 @@ and latitude policy.
 
 ## Physical scene
 
-The canonical 0.2 model uses Earth-fixed Cartesian WGS 84 positions:
+The current alpha model uses Earth-fixed Cartesian WGS 84 positions:
 
 - `SurfacePoint.ecefKm` is the physical coordinate;
 - `SurfacePoint.geographic` is a derived longitude/latitude convenience;
@@ -107,7 +117,7 @@ rendering.
 
 [`examples/leaflet-scenes.ts`](examples/leaflet-scenes.ts) renders one central
 and one partial-only eclipse in Leaflet. It stays under 50 nonblank lines and
-uses only published package APIs. Install the example's renderer separately:
+uses only the current public exports. Install the example's renderer separately:
 
 ```bash
 npm install leaflet

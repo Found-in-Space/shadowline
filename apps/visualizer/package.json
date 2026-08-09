@@ -1,6 +1,6 @@
 {
   "name": "@found-in-space/shadowline-visualizer",
-  "version": "0.2.0",
+  "version": "0.1.0-alpha.0",
   "private": true,
   "description": "Shadowline projection and renderer testbed",
   "type": "module",
@@ -11,8 +11,8 @@
     "typecheck": "tsc --project tsconfig.json --pretty false"
   },
   "dependencies": {
-    "@found-in-space/shadowline": "0.2.0",
-    "@found-in-space/shadowline-astronomy-engine": "0.2.0",
+    "@found-in-space/shadowline": "0.1.0-alpha.0",
+    "@found-in-space/shadowline-astronomy-engine": "0.1.0-alpha.0",
     "astronomy-engine": "2.1.19",
     "earcut": "3.2.3",
     "leaflet": "1.9.4",

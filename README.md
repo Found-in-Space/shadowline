@@ -4,6 +4,13 @@ Part of [Found in Space](https://foundin.space/), a project that turns real
 astronomical measurements into interactive explorations. See all repositories
 at [github.com/Found-in-Space](https://github.com/Found-in-Space).
 
+> [!WARNING]
+> **Shadowline is a very early alpha.** The public packages are available as
+> `0.1.0-alpha.0` under npm's `alpha` dist-tag. Package boundaries, APIs, data
+> structures, serialized output, and numerical behaviour are all likely to
+> change, potentially without a migration path. Use this release for evaluation
+> and experimentation, not as a stable production dependency.
+
 Shadowline is a renderer-independent solar-eclipse toolkit with a browser-native
 planning application. It calculates complete central tracks, reports
 circumstances for an observer, and exports portable GeoJSON or KML. The
@@ -18,18 +25,28 @@ reusable geometry and ephemeris integration live in focused
 `@found-in-space/*` packages, while the visualizer is an application that
 consumes their public APIs.
 
-## Install
+## Install the alpha
 
 Install the renderer-independent geometry package with the companion Astronomy
 Engine capability provider:
 
 ```bash
-npm install @found-in-space/shadowline \
-  @found-in-space/shadowline-astronomy-engine
+npm install @found-in-space/shadowline@alpha \
+  @found-in-space/shadowline-astronomy-engine@alpha
 ```
 
-Applications with their own Earth-fixed Sun and Moon ephemerides need only
-`@found-in-space/shadowline`.
+The explicit `@alpha` tag is intentional: this release is not promoted to npm's
+`latest` channel. Applications with their own Earth-fixed Sun and Moon
+ephemerides need only `@found-in-space/shadowline@alpha`.
+
+To work from the repository instead:
+
+```bash
+git clone https://github.com/Found-in-Space/shadowline.git
+cd shadowline
+npm ci
+npm run build:packages
+```
 
 ## Architecture
 
@@ -54,16 +71,16 @@ or application APIs.
 
 ## Development
 
-Node.js 22 or later is the only requirement for package and visualizer
-development:
+Node.js 22 or later is required for package and visualizer development:
 
 ```bash
-npm install
+npm ci
 npm run dev          # Vite dev server → http://127.0.0.1:5173/
 npm run typecheck    # workspace and tool TypeScript contracts
 npm test             # fast sandbox-friendly regression tests
 npm run test:validation # slower scientific reference/path validation
 npm run build        # packages and production visualizer
+npx playwright install chromium # one-time browser install
 npm run test:browser # Playwright application scenarios
 ```
 
@@ -152,6 +169,11 @@ eclipse list, then caches those results for the current browser session.
 
 ## Package API
 
+The TypeScript snippets in this README show the current alpha API. Their
+package-name imports resolve after installing both packages with the `@alpha`
+tag. Expect these examples and the APIs they demonstrate to change during the
+alpha period.
+
 ```ts
 import {
   EclipseEngine,
@@ -185,8 +207,9 @@ const shadow = localMaximum
 
 A central-and-partial Leaflet example is checked in at
 [`packages/shadowline/examples/leaflet-scenes.ts`](packages/shadowline/examples/leaflet-scenes.ts);
-it is under 50 nonblank lines, uses only published APIs, and clips derived
-display geometry at Web Mercator's latitude limit without changing the scene.
+it is under 50 nonblank lines, uses only the current public exports, and clips
+derived display geometry at Web Mercator's latitude limit without changing the
+scene.
 
 The public units are explicit:
 
@@ -209,9 +232,9 @@ const local = engine.localEclipses(
 );
 ```
 
-The maximum local-search window is 200 years. When a map point is selected, the
-SPA searches 50 years before and after the selected eclipse for nearby visible
-events.
+The maximum local-search window is 200 years. For a selected map point, the SPA
+retrieves the local timeline in 50-year chunks on either side of the chosen
+date until it has a page of nearby visible events.
 
 ## Geometry and GIS
 
@@ -332,7 +355,11 @@ See `NOTICE.md` for source acknowledgements and third-party licences.
 
 ## Releases
 
-The public packages use Changesets for versioning. See
+The first public release is `0.1.0-alpha.0`. Both packages use npm's `alpha`
+dist-tag and deliberately remain outside the `latest` channel while their APIs
+are unstable.
+
+The public packages are set up to use Changesets for versioning. See
 [`docs/releasing.md`](docs/releasing.md) for validation, packed-consumer, and
 publishing steps.
 

@@ -1,6 +1,10 @@
 # @found-in-space/shadowline-astronomy-engine
 
-Status: current 0.2 provider package.
+> [!WARNING]
+> **Very early alpha.** This package is available as `0.1.0-alpha.0` under npm's
+> `alpha` dist-tag. Its capabilities and API are likely to change, potentially
+> without a migration path. The examples describe the current alpha, not a
+> stable library.
 
 Astronomy Engine 2.1.19 capabilities for
 `@found-in-space/shadowline`.
@@ -8,14 +12,21 @@ Astronomy Engine 2.1.19 capabilities for
 This adapter supplies Earth-fixed Sun and Moon ephemerides, eclipse search, and
 observer circumstances through Shadowline's public capability interfaces.
 
-## Install
+## Install the alpha
+
+Install the provider together with the core geometry package:
 
 ```bash
-npm install @found-in-space/shadowline \
-  @found-in-space/shadowline-astronomy-engine
+npm install @found-in-space/shadowline@alpha \
+  @found-in-space/shadowline-astronomy-engine@alpha
 ```
 
+Keep the explicit `@alpha` tag until a stable release is available.
+
 ## Use
+
+This example matches the current alpha API and works after installing the two
+packages above.
 
 ```ts
 import { EclipseEngine } from "@found-in-space/shadowline";
