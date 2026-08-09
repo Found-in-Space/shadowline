@@ -1,4 +1,5 @@
 @import "./spacefarer-base.css";
+@import "./made-by-kaj.css";
 
 :root {
   --space-blue: #57a9ff;
@@ -9,6 +10,10 @@ body {
   background:
     radial-gradient(circle at 78% 28%, rgb(29 76 117 / 48%), transparent 24%),
     radial-gradient(circle at 42% 56%, #111d33 0, #070b16 43%, #03050b 82%);
+}
+
+.timeline-panel {
+  bottom: calc(20px + var(--made-by-kaj-offset));
 }
 
 .spacefarer-panel {
@@ -98,6 +103,14 @@ body {
 }
 
 @media (max-width: 760px) {
+  .legend-panel {
+    bottom: calc(175px + var(--made-by-kaj-offset));
+  }
+
+  .timeline-panel {
+    bottom: calc(8px + var(--made-by-kaj-offset));
+  }
+
   .spacefarer-panel {
     width: auto;
   }
