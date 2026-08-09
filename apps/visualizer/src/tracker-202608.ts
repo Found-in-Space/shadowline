@@ -57,10 +57,6 @@ const element = <T extends HTMLElement>(id: string): T => {
   return value as T;
 };
 
-const networkStatus = element("network-status");
-const clockStatus = element("clock-status");
-const clockDetail = element("clock-detail");
-const offlineStatus = element("offline-status");
 const modeBadge = element("mode-badge");
 const locationLabel = element("location-label");
 const locationCoordinates = element("location-coordinates");
@@ -90,7 +86,7 @@ const previewLocalTime = element("preview-local-time");
 const timeSlider = element<HTMLInputElement>("time-slider");
 const liveButton = element<HTMLButtonElement>("live-button");
 const contactList = element<HTMLOListElement>("contact-list");
-const globeStatus = element("globe-status");
+const overviewCaption = element("overview-caption");
 const overviewHint = element("overview-hint");
 const overviewFollow = element<HTMLButtonElement>("overview-follow");
 const overviewTabs: Record<OverviewView, HTMLButtonElement> = {
@@ -128,7 +124,6 @@ let localCalculationPending = false;
 let followLive = true;
 let previewTimeMs = DEFAULT_PREVIEW;
 let clockOffsetMs = 0;
-let clockSource: "device" | "cached" | "edge" = "device";
 let clockSyncPending = false;
 let rangeStartMs = FALLBACK_RANGE_START;
 let rangeEndMs = FALLBACK_RANGE_END;
@@ -143,10 +138,9 @@ let groundView: TrackerGroundView | null = null;
 let mapFollowingShadow = true;
 let instantaneousScene: EclipseScene | null = null;
 let currentSolarGeometry: ReturnType<typeof solarDiscGeometry> | null = null;
-let globeOverviewStatus = "Working out the eclipse path…";
-let shadowOverviewStatus = "Preparing the physical shadow view…";
-let groundOverviewStatus = "Choose a location to prepare the view from the ground.";
-let offlineCoreReady = false;
+let globeOverviewCaption = "";
+let shadowOverviewCaption = "";
+let groundOverviewCaption = "";
 let mercatorModulePromise: Promise<typeof import("./leaflet-renderer.js")> | null = null;
 let shadowModulePromise: Promise<typeof import("./tracker-shadow-view.js")> | null = null;
 let groundModulePromise: Promise<typeof import("./tracker-ground-view.js")> | null = null;
@@ -228,36 +222,33 @@ function setMapFollowingShadow(following: boolean): void {
   overviewPanes.map.dataset.followingShadow = String(following);
   if (following) followMercatorShadow();
   updateFollowControl();
-  if (activeOverviewView === "map") showOverviewStatus();
+  if (activeOverviewView === "map") showOverviewCaption();
 }
 
-function showOverviewStatus(): void {
+function showOverviewCaption(): void {
+  let caption = "";
   if (activeOverviewView === "globe") {
-    globeStatus.textContent = globeOverviewStatus;
+    caption = globeOverviewCaption;
     overviewHint.textContent = "Drag to explore · tap to choose a location";
   } else if (activeOverviewView === "map") {
-    globeStatus.textContent = !mercator
-      ? "Preparing the map…"
-      : mapFollowingShadow
-        ? "The map is following the shadow. Tap anywhere to calculate the eclipse there."
-        : "The map will stay where you left it. Choose Follow shadow to catch up.";
+    caption = globeOverviewCaption;
     overviewHint.textContent = mapFollowingShadow
       ? "Drag or zoom to hold another view · tap to choose"
       : "Drag to move · pinch to zoom · tap to choose";
   } else if (activeOverviewView === "shadow") {
     const following = shadowView?.isFollowingShadow() ?? true;
-    globeStatus.textContent = following
-      ? shadowOverviewStatus
-      : `The view will stay where you left it. ${shadowOverviewStatus}`;
+    caption = shadowOverviewCaption;
     overviewHint.textContent = following
       ? "Drag or zoom to hold another view"
       : "Drag to turn · pinch to zoom";
   } else {
-    globeStatus.textContent = groundOverviewStatus;
+    caption = groundOverviewCaption;
     overviewHint.textContent = observer
       ? "Fixed view from your chosen location"
       : "Choose a location on the globe or map first";
   }
+  overviewCaption.textContent = caption;
+  overviewCaption.hidden = caption === "";
 }
 
 async function ensureMercator(): Promise<LeafletMercatorRenderer> {
@@ -301,12 +292,12 @@ async function ensureShadowView(): Promise<TrackerShadowView> {
   const module = await loadShadowModule();
   shadowView = new module.TrackerShadowView(overviewPanes.shadow, {
     onStatus: (message) => {
-      shadowOverviewStatus = message;
-      if (activeOverviewView === "shadow") showOverviewStatus();
+      shadowOverviewCaption = message;
+      if (activeOverviewView === "shadow") showOverviewCaption();
     },
     onFollowingChange: () => {
       updateFollowControl();
-      if (activeOverviewView === "shadow") showOverviewStatus();
+      if (activeOverviewView === "shadow") showOverviewCaption();
     },
   });
   shadowView.setTime(currentTrackerTime());
@@ -318,8 +309,8 @@ async function ensureGroundView(): Promise<TrackerGroundView> {
   const module = await loadGroundModule();
   groundView = new module.TrackerGroundView(overviewPanes.ground, {
     onStatus: (message) => {
-      groundOverviewStatus = message;
-      if (activeOverviewView === "ground") showOverviewStatus();
+      groundOverviewCaption = message;
+      if (activeOverviewView === "ground") showOverviewCaption();
     },
   });
   groundView.setTime(currentSolarGeometry);
@@ -341,7 +332,7 @@ async function selectOverviewView(view: OverviewView, focus = false): Promise<vo
   shadowView?.setActive(view === "shadow");
   groundView?.setActive(view === "ground");
   updateFollowControl();
-  showOverviewStatus();
+  showOverviewCaption();
   try {
     if (view === "map") await ensureMercator();
     if (view === "shadow") {
@@ -355,14 +346,15 @@ async function selectOverviewView(view: OverviewView, focus = false): Promise<vo
       renderer.setTime(currentSolarGeometry);
     }
     updateFollowControl();
-    showOverviewStatus();
+    showOverviewCaption();
   } catch (error) {
     console.error(error);
-    globeStatus.textContent = view === "map"
+    overviewCaption.textContent = view === "map"
       ? "The map could not load. The globe is still available."
       : view === "shadow"
-        ? "The physical shadow view could not load. The globe is still available."
+        ? "The shadow view is unavailable. The globe is still available."
         : "The ground view could not load. The other views are still available.";
+    overviewCaption.hidden = false;
   }
   if (focus) overviewPanes[view].focus({ preventScroll: true });
 }
@@ -400,9 +392,6 @@ function scheduleOptionalViewPreload(): void {
       const module = await loadShadowModule();
       await module.preloadTrackerShadowAssets();
       document.documentElement.dataset.optionalViewsReady = "true";
-      if (offlineCoreReady) {
-        offlineStatus.textContent = "Ready for a poor connection. All four views are saved; terrain for places you open is saved as it loads.";
-      }
     }, 7_000);
   };
   if (document.readyState === "complete") schedule();
@@ -436,8 +425,8 @@ function updateElevationInput(
     ? ""
     : String(Math.round(observerValue.elevationMeters ?? 0));
   elevationInput.placeholder = source === "terrain"
-    ? `Calculated: ${Math.round(observerValue.elevationMeters ?? 0)} m`
-    : "Calculated if blank";
+    ? `Estimated: ${Math.round(observerValue.elevationMeters ?? 0)} m`
+    : "Estimated if blank";
   elevationInput.dataset.source = source;
 }
 
@@ -453,6 +442,11 @@ function compassDirection(degrees: number): string {
     "north-west",
   ];
   return directions[Math.round(degrees / 45) % directions.length]!;
+}
+
+function sunHeight(degrees: number): string {
+  if (Math.abs(degrees) < 0.05) return "at the horizon";
+  return `${Math.abs(degrees).toFixed(1)}° ${degrees > 0 ? "above" : "below"} the horizon`;
 }
 
 function utcTime(value: string | number): string {
@@ -530,7 +524,7 @@ function formatCountdown(milliseconds: number): string {
 }
 
 function currentPhase(atMs: number): string {
-  if (localCalculationPending) return "Calculating your view";
+  if (localCalculationPending) return "—";
   if (!localEclipse) return observer ? "Not visible here" : "Choose your location";
   const c1 = Date.parse(localEclipse.partialBegin.utc);
   const c4 = Date.parse(localEclipse.partialEnd.utc);
@@ -549,14 +543,14 @@ function renderCountdown(atMs: number): void {
     ? "Next at this location"
     : "Next eclipse event";
   if (!observer && !overviewScene) {
-    nextEventLabel.textContent = "Preparing the eclipse timeline";
+    nextEventLabel.textContent = "Choose a location";
     countdown.textContent = "--:--:--";
     return;
   }
   if (localCalculationPending) {
-    nextEventLabel.textContent = "Calculating your eclipse times";
+    nextEventLabel.textContent = "—";
     countdown.textContent = "--:--:--";
-    nextEventTime.textContent = "Using your location and height above sea level.";
+    nextEventTime.textContent = "";
     return;
   }
   if (observer && !localEclipse) {
@@ -579,11 +573,13 @@ function renderCountdown(atMs: number): void {
 function renderContactList(atMs: number): void {
   const contacts = localEclipse ? localContacts(localEclipse) : [];
   if (contacts.length === 0) {
-    const message = localCalculationPending
-      ? "Calculating your eclipse times…"
-      : observer
-        ? "The eclipse is not visible from this location."
-        : "Choose a location to see when the eclipse begins, reaches its maximum and ends.";
+    if (localCalculationPending) {
+      contactList.replaceChildren();
+      return;
+    }
+    const message = observer
+      ? "The eclipse is not visible from this location."
+      : "Choose a location to see when the eclipse begins, reaches its maximum and ends.";
     contactList.innerHTML = `<li class="placeholder-contact">${message}</li>`;
     return;
   }
@@ -592,7 +588,7 @@ function renderContactList(atMs: number): void {
       const contactMs = Date.parse(contact.utc);
       const state = atMs >= contactMs ? "is-past" : "";
       const altitude = contact.contact
-        ? `<span>Sun ${contact.contact.sunAltitudeDeg.toFixed(1)}° above the horizon · facing ${compassDirection(contact.contact.sunAzimuthDeg)}</span>`
+        ? `<span>Sun ${sunHeight(contact.contact.sunAltitudeDeg)} · facing ${compassDirection(contact.contact.sunAzimuthDeg)}</span>`
         : "";
       return `<li class="${state}"><div><strong>${contact.label}</strong>${altitude}</div><time datetime="${contact.utc}">${utcTime(contact.utc)}</time></li>`;
     })
@@ -629,7 +625,7 @@ function renderDisc(atMs: number): void {
     horizonMarker.textContent = horizon.state === "crossing"
       ? "Partly below horizon"
       : "Below horizon";
-    sunAltitude.textContent = `${geometry.sunAltitudeDeg.toFixed(1)}°`;
+    sunAltitude.textContent = sunHeight(geometry.sunAltitudeDeg);
     sunAzimuth.textContent = `${compassDirection(geometry.sunAzimuthDeg)} · ${geometry.sunAzimuthDeg.toFixed(1)}°`;
     const horizonDescription = geometry.sunAltitudeDeg < 0
       ? `${Math.abs(geometry.sunAltitudeDeg).toFixed(1)} degrees below the horizon`
@@ -731,7 +727,6 @@ async function setObserver(
   nextObserver: Observer,
   source: LocationSource,
   refineTerrain = false,
-  elevationDetail = "",
   elevationSource: ElevationSource = refineTerrain
     ? "pending"
     : source === "gps"
@@ -757,7 +752,7 @@ async function setObserver(
           ? "Location chosen on the map"
           : "Entered location";
   locationCoordinates.textContent = coordinates(nextObserver);
-  locationMessage.textContent = "Working out what the eclipse will look like here…";
+  locationMessage.textContent = "";
   latitudeInput.value = coordinateInputValue(nextObserver.latitudeDeg);
   longitudeInput.value = coordinateInputValue(nextObserver.longitudeDeg);
   updateElevationInput(nextObserver, elevationSource);
@@ -796,7 +791,6 @@ async function setObserver(
         { ...nextObserver, elevationMeters },
         source,
         false,
-        `The terrain map puts this location about ${Math.round(elevationMeters)} m above sea level.`,
         "terrain",
       );
     }).catch(() => {
@@ -813,8 +807,8 @@ async function setObserver(
       ? " This is only a rough location. Use GPS or enter a location before relying on these times."
       : "";
     locationMessage.textContent = result.local
-      ? `${result.local.kind === "total" ? "You can see totality" : "You can see a partial eclipse"} from this location.${approximationDetail}${elevationDetail ? ` ${elevationDetail}` : ""}`
-      : `The eclipse will not be visible from this location.${approximationDetail}${elevationDetail ? ` ${elevationDetail}` : ""}`;
+      ? `${result.local.kind === "total" ? "You can see totality" : "You can see a partial eclipse"} from this location.${approximationDetail}`
+      : `The eclipse will not be visible from this location.${approximationDetail}`;
     updateRange();
     groundView?.setLocation(nextObserver, rangeStartMs, rangeEndMs);
     renderFrame();
@@ -923,13 +917,6 @@ function calibrationAge(calibration: ClockCalibration): number {
   return Date.now() + calibration.offsetMs - calibration.calibratedAtMs;
 }
 
-function clockAdjustmentMessage(offsetMs: number): string {
-  const differenceSeconds = Math.abs(offsetMs) / 1000;
-  if (differenceSeconds < 0.005) return "No clock adjustment was needed.";
-  const direction = offsetMs > 0 ? "slow" : "fast";
-  return `This device was ${differenceSeconds.toFixed(2)} seconds ${direction}, so the countdown has been corrected.`;
-}
-
 function loadCachedClock(): void {
   try {
     const calibration = JSON.parse(
@@ -947,11 +934,6 @@ function loadCachedClock(): void {
       return;
     }
     clockOffsetMs = calibration.offsetMs;
-    clockSource = "cached";
-    clockStatus.textContent = "Time checked earlier";
-    clockStatus.classList.add("is-ready");
-    const ageMinutes = Math.max(1, Math.round(ageMs / 60_000));
-    clockDetail.textContent = `The time was checked online ${ageMinutes} minute${ageMinutes === 1 ? "" : "s"} ago. The countdown is still using that correction.`;
   } catch {
     localStorage.removeItem(CLOCK_STORAGE_KEY);
   }
@@ -967,8 +949,8 @@ async function initializeModel(): Promise<void> {
     globe.fitPath();
     globe.showPeak(undefined, undefined);
     mercator?.showPath(result.scene);
-    globeOverviewStatus = "Purple shows where the Sun will be completely covered. The shaded areas show where the Moon will cover part or all of the Sun at the chosen time.";
-    showOverviewStatus();
+    globeOverviewCaption = "Purple shows where the Sun will be completely covered. The shaded areas show where the Moon will cover part or all of the Sun at the chosen time.";
+    showOverviewCaption();
     updateRange();
     renderFrame();
     const urlObserver = observerFromUrl();
@@ -984,7 +966,6 @@ async function initializeModel(): Promise<void> {
         initialObserver,
         source,
         Boolean(urlObserver && !hasUrlElevation),
-        "",
         urlObserver
           ? hasUrlElevation ? "explicit" : "pending"
           : savedElevationSource(),
@@ -994,8 +975,8 @@ async function initializeModel(): Promise<void> {
     }
   } catch (error) {
     console.error(error);
-    globeOverviewStatus = "The eclipse map could not load. Reload the page to try again.";
-    showOverviewStatus();
+    globeOverviewCaption = "The eclipse map could not load. Reload the page to try again.";
+    showOverviewCaption();
   }
 }
 
@@ -1023,42 +1004,21 @@ async function syncClock(): Promise<void> {
   }
   try {
     const best = samples.sort((first, second) => first.roundTrip - second.roundTrip)[0];
-    if (!best) {
-      if (clockSource === "device") {
-        clockStatus.textContent = "Using device time";
-        clockDetail.textContent = "The online time check did not work, so the countdown is using this device’s clock.";
-      }
-      return;
-    }
+    if (!best) return;
     clockOffsetMs = best.offset;
-    clockSource = "edge";
     const calibration: ClockCalibration = {
       offsetMs: best.offset,
       roundTripMs: best.roundTrip,
       calibratedAtMs: Date.now() + best.offset,
     };
     localStorage.setItem(CLOCK_STORAGE_KEY, JSON.stringify(calibration));
-    clockStatus.textContent = "Time checked";
-    clockStatus.classList.add("is-ready");
-    clockDetail.textContent = `Time checked online. ${clockAdjustmentMessage(best.offset)}`;
   } finally {
     clockSyncPending = false;
   }
 }
 
-function updateNetworkStatus(): void {
-  const online = navigator.onLine;
-  networkStatus.textContent = online ? "Online" : "Offline";
-  networkStatus.classList.toggle("is-ready", online);
-  networkStatus.classList.toggle("is-offline", !online);
-  if (!online && clockSource === "edge") {
-    clockStatus.textContent = "Time checked earlier";
-  }
-}
-
 async function prepareOffline(): Promise<void> {
   if (!("serviceWorker" in navigator) || !import.meta.env.PROD) {
-    offlineStatus.textContent = "Offline use will be prepared in the published app.";
     return;
   }
   try {
@@ -1069,12 +1029,8 @@ async function prepareOffline(): Promise<void> {
     });
     if (navigator.onLine) await registration.update();
     await navigator.serviceWorker.ready;
-    offlineCoreReady = true;
-    offlineStatus.textContent = document.documentElement.dataset.optionalViewsReady === "true"
-      ? "Ready for a poor connection. All four views are saved; terrain for places you open is saved as it loads."
-      : "The main tracker is ready for a poor connection. The map, shadow and ground views will be saved quietly while you are online.";
   } catch {
-    offlineStatus.textContent = "Offline setup did not finish. Keep this page open if your connection may drop.";
+    // Offline support is optional; the live tracker remains available.
   }
 }
 
@@ -1085,7 +1041,7 @@ gpsButton.addEventListener("click", () => {
   }
   gpsButton.disabled = true;
   gpsButton.textContent = "Finding GPS…";
-  locationMessage.textContent = "Waiting for an accurate GPS location…";
+  locationMessage.textContent = "";
   navigator.geolocation.getCurrentPosition(
     (position) => {
       gpsButton.disabled = false;
@@ -1195,19 +1151,16 @@ liveButton.addEventListener("click", () => {
 });
 
 window.addEventListener("online", () => {
-  updateNetworkStatus();
   void syncClock();
   void resolveApproximateLocation();
   scheduleOptionalViewPreload();
 });
-window.addEventListener("offline", updateNetworkStatus);
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "visible") void syncClock();
 });
 
 restorePreviewFromUrl();
 loadCachedClock();
-updateNetworkStatus();
 updateRange();
 renderFrame();
 void initializeModel();

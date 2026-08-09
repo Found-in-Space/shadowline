@@ -202,7 +202,7 @@ export class TrackerGroundView {
     delete this.container.dataset.terrainReady;
     this.attribution.textContent = "";
     this.bearing.textContent = "";
-    this.status("Working out the local eclipse track before loading terrain…");
+    this.status("");
     this.draw();
   }
 
@@ -220,6 +220,7 @@ export class TrackerGroundView {
     this.cancelBuild();
     this.replaceSnapshot(null);
     delete this.container.dataset.terrainReady;
+    this.status("");
     if (this.active) void this.rebuild();
   }
 
@@ -297,7 +298,7 @@ export class TrackerGroundView {
     this.camera = camera;
     this.updateBearing(camera);
     this.draw();
-    this.status("Loading detailed terrain and photography directly from the tile providers…");
+    this.status("");
     try {
       const snapshot = await renderGroundTerrainSnapshot({
         observer: location.observer,
@@ -305,10 +306,6 @@ export class TrackerGroundView {
         width: size.width,
         height: size.height,
         signal: controller.signal,
-        onProgress: (loaded, total) => {
-          if (version !== this.buildVersion) return;
-          this.status(`Loading ground view… ${loaded} of ${total} terrain tiles`);
-        },
       });
       if (version !== this.buildVersion || controller.signal.aborted) {
         snapshot.bitmap.close();
@@ -317,16 +314,13 @@ export class TrackerGroundView {
       this.replaceSnapshot(snapshot);
       this.attribution.textContent = snapshot.attribution;
       this.container.dataset.terrainReady = "true";
-      this.status(snapshot.photographic
-        ? `Ground view ready, facing ${compassDirection(camera.bearingDeg)}. ` +
-          `${snapshot.tileCount} terrain tiles were rendered once for this location.`
-        : `Terrain is ready, facing ${compassDirection(camera.bearingDeg)}, but MapTiler photography is not configured.`);
+      this.status("");
       this.draw();
     } catch (error) {
       if (controller.signal.aborted || version !== this.buildVersion) return;
       console.error(error);
       delete this.container.dataset.terrainReady;
-      this.status("The live sky is available, but the terrain tiles could not be loaded.");
+      this.status("Local terrain is unavailable; the sky view is still shown.");
       this.draw();
     } finally {
       if (version === this.buildVersion) this.controller = null;
