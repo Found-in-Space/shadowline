@@ -2,7 +2,11 @@ const worker = {
   async fetch(request, environment) {
     const url = new URL(request.url);
 
-    if (url.pathname.endsWith("/tracker/202608")) {
+    if (
+      url.pathname.endsWith("/browse") ||
+      url.pathname.endsWith("/spacefarer") ||
+      url.pathname.endsWith("/tracker/202608")
+    ) {
       url.pathname += "/";
       return Response.redirect(url, 308);
     }

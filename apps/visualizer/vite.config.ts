@@ -9,7 +9,8 @@ export default defineConfig({
     sourcemap: true,
     rollupOptions: {
       input: {
-        explorer: resolve(import.meta.dirname, "index.html"),
+        landing: resolve(import.meta.dirname, "index.html"),
+        explorer: resolve(import.meta.dirname, "browse/index.html"),
         spacefarer: resolve(
           import.meta.dirname,
           "spacefarer/index.html",
