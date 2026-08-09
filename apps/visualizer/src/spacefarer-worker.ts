@@ -22,13 +22,17 @@ import {
 import {
   earthFixedToEquatorialJ2000Basis,
 } from "./celestial-frame.js";
-import { configureOperationalDeltaT202608 } from "./tracker-astronomy.js";
+import {
+  configureGeneralDeltaT,
+  configureOperationalDeltaT202608,
+} from "./tracker-astronomy.js";
 import type { SpacefarerFrame } from "./spacefarer-frame.js";
 
 interface FrameRequest {
   type: "frame";
   requestId: number;
   atUtc: string;
+  event?: EclipseSummary;
   angularIntervalDegrees?: number;
 }
 
@@ -51,7 +55,7 @@ const eclipseEvent = engine
 if (!eclipseEvent) {
   throw new Error("The 12 August 2026 total eclipse was not found.");
 }
-const event: EclipseSummary = eclipseEvent;
+const defaultEvent: EclipseSummary = eclipseEvent;
 
 function kilometres(
   body: "sun" | "moon",
@@ -80,7 +84,11 @@ function ringPoints(
   );
 }
 
-function frame(atUtc: string, angularIntervalDegrees = 3): SpacefarerFrame {
+function frame(
+  atUtc: string,
+  angularIntervalDegrees = 3,
+  event: EclipseSummary = defaultEvent,
+): SpacefarerFrame {
   const sunEcefKm = kilometres("sun", atUtc);
   const moonEcefKm = kilometres("moon", atUtc);
   const direction = normalize(subtract(moonEcefKm, sunEcefKm));
@@ -140,14 +148,15 @@ function frame(atUtc: string, angularIntervalDegrees = 3): SpacefarerFrame {
 
 self.postMessage({
   type: "ready",
-  event,
+  event: defaultEvent,
 });
 
 self.addEventListener("message", (message: MessageEvent<WorkerRequest>) => {
   const request = message.data;
   if (request.type === "range") {
     try {
-      const contacts = engine.calculateGlobalContacts(event);
+      configureOperationalDeltaT202608();
+      const contacts = engine.calculateGlobalContacts(defaultEvent);
       const first = contacts[0];
       const last = contacts.at(-1);
       if (!first || !last || first.utc === last.utc) {
@@ -167,10 +176,19 @@ self.addEventListener("message", (message: MessageEvent<WorkerRequest>) => {
     return;
   }
   try {
+    if (request.event) {
+      configureGeneralDeltaT();
+    } else {
+      configureOperationalDeltaT202608();
+    }
     self.postMessage({
       type: "frame",
       requestId: request.requestId,
-      frame: frame(request.atUtc, request.angularIntervalDegrees),
+      frame: frame(
+        request.atUtc,
+        request.angularIntervalDegrees,
+        request.event,
+      ),
     });
   } catch (error) {
     self.postMessage({

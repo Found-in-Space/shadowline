@@ -13,6 +13,7 @@ import {
 import { EclipseMapWorkspace } from "./map-workspace.js";
 import { solarDiscGeometry } from "./tracker-astronomy.js";
 import { TrackerGroundView } from "./tracker-ground-view.js";
+import { TrackerShadowView } from "./tracker-shadow-view.js";
 import {
   DEFAULT_LAYER_VISIBILITY,
   ECLIPSE_LAYER_KEYS,
@@ -81,6 +82,12 @@ const sidebar = element<HTMLElement>("sidebar");
 const sidebarToggle = element<HTMLButtonElement>("sidebar-toggle");
 const sidebarClose = element<HTMLButtonElement>("sidebar-close");
 const groundStatus = element<HTMLParagraphElement>("ground-status");
+const spacefarerStatus = element<HTMLParagraphElement>("spacefarer-status");
+const spacefarerContainer = element<HTMLDivElement>("spacefarer-view");
+const spacefarerFollow = element<HTMLButtonElement>("spacefarer-follow");
+const mercatorContainer = element<HTMLDivElement>("mercator-map");
+const worldContainer = element<HTMLDivElement>("world-map");
+const groundContainer = element<HTMLDivElement>("ground-map");
 
 const nowUtc = new Date().toISOString();
 let locatorMode: LocatorMode = "date";
@@ -90,6 +97,8 @@ let providerMetadata: ProviderMetadata | null = null;
 let selectedEvent: EclipseSummary;
 let selectedScene: EclipseScene | null = null;
 let selectedObserver: Observer | null = null;
+let spacefarerMomentLabel = "Global peak";
+let spacefarerStatusMessage = "Preparing the physical view…";
 let selectionVersion = 0;
 let locationVersion = 0;
 const eventsById = new Map<string, EclipseSummary>();
@@ -113,13 +122,37 @@ const placeTimeline = timelineState("Visible eclipses at a selected place");
 
 const map = new EclipseMapWorkspace(
   {
-    mercator: element("mercator-map"),
-    globe: element("globe-map"),
-    world: element("world-map"),
+    mercator: mercatorContainer,
+    world: worldContainer,
   },
   readMapView(),
 );
-const ground = new TrackerGroundView(element("ground-map"), {
+let spacefarer: TrackerShadowView | null = null;
+try {
+  spacefarer = new TrackerShadowView(spacefarerContainer, {
+    onStatus: (message) => {
+      spacefarerStatusMessage = message;
+      spacefarerStatus.textContent =
+        `${spacefarerMomentLabel} · ${spacefarerStatusMessage}`;
+    },
+    onFollowingChange: (following) => {
+      spacefarerFollow.setAttribute("aria-pressed", String(following));
+      spacefarerFollow.textContent = following
+        ? "Following shadow"
+        : "Return to Sun–Earth plane";
+    },
+  });
+  spacefarer.setActive(true);
+} catch {
+  spacefarerContainer.dataset.rendererReady = "false";
+  spacefarerStatus.textContent =
+    "The physical Spacefarer view is unavailable in this browser.";
+  spacefarerFollow.disabled = true;
+}
+spacefarerFollow.addEventListener("click", () => {
+  spacefarer?.resumeFollowing();
+});
+const ground = new TrackerGroundView(groundContainer, {
   onStatus: (message) => {
     groundStatus.textContent = message;
     groundStatus.hidden =
@@ -284,7 +317,7 @@ function renderTimeline(): void {
 
   const message =
     locatorMode === "place" && !selectedObserver
-      ? "Choose a point on any map to find eclipses visible there."
+      ? "Choose a point on either map to find eclipses visible there."
       : !state.initialized
         ? locatorMode === "place"
           ? "Finding visible eclipses…"
@@ -604,25 +637,54 @@ function formatDuration(seconds: number): string {
   return `${minutes}m ${(seconds - minutes * 60).toFixed(1)}s`;
 }
 
-function updateGroundVisual(
+function showComparisonInstant(
   event: EclipseSummary,
   observer: Observer,
   local: LocalEclipse | null,
+  shadowScene: EclipseScene | null,
+  atUtc: string,
 ): void {
-  const peakMs = Date.parse(local?.peak.utc ?? event.peakUtc);
+  const peakMs = Date.parse(atUtc);
   const fallbackRadiusMs = 3 * 60 * 60 * 1000;
+  map.showShadowOutline(shadowScene);
   ground.setLocation(
     observer,
     local ? Date.parse(local.partialBegin.utc) : peakMs - fallbackRadiusMs,
     local ? Date.parse(local.partialEnd.utc) : peakMs + fallbackRadiusMs,
   );
   ground.setTime(solarDiscGeometry(observer, new Date(peakMs)));
+  spacefarer?.setTime(peakMs, event);
+  const utcClock = new Date(peakMs).toISOString().slice(11, 19);
+  spacefarerMomentLabel = local
+    ? `All four views · ${utcClock} UTC`
+    : `All four views · global peak · ${utcClock} UTC`;
+  spacefarerStatus.textContent =
+    `${spacefarerMomentLabel} · ${spacefarerStatusMessage}`;
+  for (const container of [
+    mercatorContainer,
+    worldContainer,
+    spacefarerContainer,
+    groundContainer,
+  ]) {
+    container.dataset.comparisonUtc = atUtc;
+  }
 }
 
 async function calculateSelectedLocation(observer: Observer): Promise<void> {
   const version = ++locationVersion;
   const event = selectedEvent;
   map.clearShadowOutline();
+  for (const container of [
+    mercatorContainer,
+    worldContainer,
+    spacefarerContainer,
+    groundContainer,
+  ]) {
+    delete container.dataset.comparisonUtc;
+  }
+  spacefarerMomentLabel = "Finding the selected place’s local maximum";
+  spacefarerStatus.textContent =
+    `${spacefarerMomentLabel} · ${spacefarerStatusMessage}`;
   locationResults.innerHTML = `<div class="place-coordinate">
       <span>Selected point</span>
       <strong>${observer.latitudeDeg.toFixed(5)}°, ${observer.longitudeDeg.toFixed(5)}°</strong>
@@ -630,21 +692,28 @@ async function calculateSelectedLocation(observer: Observer): Promise<void> {
   try {
     const result = await worker.calculateLocation(event, observer);
     if (version !== locationVersion || event.id !== selectedEvent.id) return;
-    updateGroundVisual(event, observer, result.selected);
-    map.showShadowOutline(result.shadowScene);
+    showComparisonInstant(
+      event,
+      observer,
+      result.selected,
+      result.shadowScene,
+      result.atUtc,
+    );
     locationResults.innerHTML = `<div class="place-coordinate">
         <span>Selected point</span>
         <strong>${observer.latitudeDeg.toFixed(5)}°, ${observer.longitudeDeg.toFixed(5)}°</strong>
       </div>
       ${renderCurrentEventLocal(result.selected)}
       ${
-        result.shadowScene
-          ? `<p class="window-note">${kindLabel(result.selected!.kind)} and penumbra outlines shown at this location’s maximum.</p>`
+        result.shadowScene && result.selected
+          ? `<p class="window-note">All four views now show this location’s maximum at the same instant. The ${kindLabel(result.selected.kind).toLowerCase()} and penumbra outlines shown on both maps are synchronized with Spacefarer.</p>`
+          : result.shadowScene
+            ? `<p class="window-note">All four views show global peak because this eclipse is not visible from the selected place.</p>`
           : ""
       }`;
   } catch (error) {
     if (version !== locationVersion) return;
-    updateGroundVisual(event, observer, null);
+    showComparisonInstant(event, observer, null, null, event.peakUtc);
     locationResults.innerHTML = `<div class="place-coordinate">
         <span>Selected point</span>
         <strong>${observer.latitudeDeg.toFixed(5)}°, ${observer.longitudeDeg.toFixed(5)}°</strong>
@@ -675,6 +744,20 @@ async function selectEvent(event: EclipseSummary): Promise<void> {
   const version = ++selectionVersion;
   locationVersion += 1;
   selectedEvent = event;
+  spacefarerMomentLabel = selectedObserver
+    ? "Finding the selected place’s local maximum"
+    : "Global peak";
+  spacefarerStatus.textContent =
+    `${spacefarerMomentLabel} · ${spacefarerStatusMessage}`;
+  spacefarer?.setTime(Date.parse(event.peakUtc), event);
+  for (const container of [
+    mercatorContainer,
+    worldContainer,
+    spacefarerContainer,
+    groundContainer,
+  ]) {
+    delete container.dataset.comparisonUtc;
+  }
   if (selectedObserver) {
     ground.setLocationPending(selectedObserver);
     ground.setTime(null);
@@ -685,6 +768,7 @@ async function selectEvent(event: EclipseSummary): Promise<void> {
   fitButton.disabled = true;
   geoJsonButton.disabled = true;
   kmlButton.disabled = true;
+  map.clearShadowOutline();
   map.clearPath();
   map.showPeak(
     event.peakLocation?.latitudeDeg,

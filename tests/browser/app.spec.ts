@@ -48,14 +48,16 @@ test("requests Blue Marble from the cacheable GIBS WMTS service", async ({
   ).toHaveCount(2);
 });
 
-test("initializes four coordinated visual panels", async ({ page }) => {
+test("initializes four complementary visual panels", async ({ page }) => {
   await page.goto("/browse/?eclipse=solar-2026-08-12-total");
 
   await expect(
     page.getByRole("article", { name: "OpenStreetMap · Web Mercator" }),
   ).toBeVisible();
   await expect(
-    page.getByRole("article", { name: "OpenStreetMap · 3D globe" }),
+    page.getByRole("article", {
+      name: "Spacefarer · Sun–Earth plane",
+    }),
   ).toBeVisible();
   await expect(
     page.getByRole("article", {
@@ -65,7 +67,7 @@ test("initializes four coordinated visual panels", async ({ page }) => {
   await expect(
     page.getByRole("article", { name: "Terrain · Ground view" }),
   ).toBeVisible();
-  for (const id of ["mercator-map", "globe-map", "world-map"]) {
+  for (const id of ["mercator-map", "world-map"]) {
     await expect(page.locator(`#${id}`)).toHaveAttribute(
       "data-renderer-ready",
       "true",
@@ -80,9 +82,21 @@ test("initializes four coordinated visual panels", async ({ page }) => {
       )
       .toBeGreaterThan(0);
   }
-  await expect(page.locator("#globe-map")).toHaveAttribute(
-    "data-projection",
-    "globe",
+  await expect(page.locator("#spacefarer-view")).toHaveAttribute(
+    "data-renderer-ready",
+    "true",
+  );
+  await expect(page.locator("#spacefarer-view canvas")).toHaveCount(1);
+  await expect(page.locator("#spacefarer-view")).toHaveAttribute(
+    "data-event-id",
+    "solar-2026-08-12-total",
+  );
+  await expect(page.locator("#spacefarer-view")).toHaveAttribute(
+    "data-following-shadow",
+    "true",
+  );
+  await expect(page.locator("#spacefarer-status")).not.toHaveText(
+    "Preparing the physical view…",
   );
   await expect(page.locator("#ground-map canvas")).toHaveAttribute(
     "aria-label",
@@ -90,7 +104,7 @@ test("initializes four coordinated visual panels", async ({ page }) => {
   );
 });
 
-test("lets every map fill its projection panel edge to edge", async ({
+test("lets every view fill its panel edge to edge", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
@@ -145,6 +159,40 @@ test("lets every map fill its projection panel edge to edge", async ({
   expect(layout.panels[1]!.panel.bottom).toBeCloseTo(
     layout.panels[3]!.panel.top,
     5,
+  );
+});
+
+test("keeps Spacefarer in its shared shadow frame until it is moved", async ({
+  page,
+}) => {
+  await page.goto("/browse/?eclipse=solar-2026-08-12-total");
+  await expect(page.locator("#spacefarer-view")).toHaveAttribute(
+    "data-following-shadow",
+    "true",
+  );
+
+  const canvas = page.locator("#spacefarer-view canvas");
+  const bounds = await canvas.boundingBox();
+  if (!bounds) throw new Error("The Spacefarer panel has no visible bounds.");
+  await page.mouse.move(
+    bounds.x + bounds.width / 2,
+    bounds.y + bounds.height / 2,
+  );
+  await page.mouse.down();
+  await page.mouse.move(
+    bounds.x + bounds.width / 2 + 45,
+    bounds.y + bounds.height / 2 + 20,
+  );
+  await page.mouse.up();
+
+  await expect(page.locator("#spacefarer-view")).toHaveAttribute(
+    "data-following-shadow",
+    "false",
+  );
+  await page.getByRole("button", { name: "Return to Sun–Earth plane" }).click();
+  await expect(page.locator("#spacefarer-view")).toHaveAttribute(
+    "data-following-shadow",
+    "true",
   );
 });
 
@@ -506,7 +554,7 @@ test("uses the maps as the place picker while keeping date discovery active", as
   await expect(page.getByText("Local history window")).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "At selected place" })).toBeVisible();
   await expect(
-    page.getByText("Click any map to see local circumstances for the selected eclipse."),
+    page.getByText("Click either map to compare the same instant in all four views."),
   ).toBeVisible();
   await expect(page.getByRole("tab", { name: "By date" })).toHaveAttribute(
     "aria-selected",
@@ -563,7 +611,7 @@ test("calculates shadows by clicking an eclipse overlay", async ({ page }) => {
   await expect(page).toHaveURL(/lat=65\./);
 });
 
-test("selects one synchronized observer from every projection", async ({
+test("selects one synchronized observer from either map", async ({
   page,
 }) => {
   await page.goto("/browse/?eclipse=solar-2026-08-12-total");
@@ -571,7 +619,7 @@ test("selects one synchronized observer from every projection", async ({
     page.getByText("track calculated from", { exact: false }),
   ).toBeVisible();
 
-  for (const id of ["mercator-map", "globe-map", "world-map"]) {
+  for (const id of ["mercator-map", "world-map"]) {
     await page.locator(`#${id}`).click();
     const latitude = await page
       .locator(`#${id}`)
@@ -581,11 +629,7 @@ test("selects one synchronized observer from every projection", async ({
       .getAttribute("data-selected-longitude");
     expect(latitude).not.toBeNull();
     expect(longitude).not.toBeNull();
-    for (const synchronizedId of [
-      "mercator-map",
-      "globe-map",
-      "world-map",
-    ]) {
+    for (const synchronizedId of ["mercator-map", "world-map"]) {
       await expect(page.locator(`#${synchronizedId}`)).toHaveAttribute(
         "data-selected-latitude",
         latitude!,
@@ -598,7 +642,45 @@ test("selects one synchronized observer from every projection", async ({
   }
 });
 
-test("renders and round-trips a selected location at the pole", async ({
+test("shows the same selected instant in all four views", async ({ page }) => {
+  await page.goto(
+    "/browse/?eclipse=solar-2026-08-12-total&lat=65.21900&lon=-25.25200",
+  );
+  await expect(page.getByText("Total at this point")).toBeVisible();
+
+  const instant = await page.locator("#mercator-map").getAttribute(
+    "data-comparison-utc",
+  );
+  expect(instant).not.toBeNull();
+  for (const id of ["world-map", "spacefarer-view", "ground-map"]) {
+    await expect(page.locator(`#${id}`)).toHaveAttribute(
+      "data-comparison-utc",
+      instant!,
+    );
+  }
+  for (const id of ["mercator-map", "world-map"]) {
+    await expect
+      .poll(async () =>
+        Number(
+          (await page.locator(`#${id}`).getAttribute(
+            "data-shadow-feature-count",
+          )) ?? 0,
+        ),
+      )
+      .toBeGreaterThan(0);
+  }
+  await expect
+    .poll(async () =>
+      Date.parse(
+        (await page.locator("#spacefarer-view").getAttribute(
+          "data-frame-utc",
+        )) ?? "",
+      ),
+    )
+    .toBe(Date.parse(instant!));
+});
+
+test("round-trips a selected location at the pole", async ({
   page,
 }) => {
   await page.goto(
@@ -608,7 +690,7 @@ test("renders and round-trips a selected location at the pole", async ({
     page.getByText("track calculated from", { exact: false }),
   ).toBeVisible();
 
-  for (const id of ["mercator-map", "globe-map", "world-map"]) {
+  for (const id of ["mercator-map", "world-map"]) {
     await expect(page.locator(`#${id}`)).toHaveAttribute(
       "data-selected-latitude",
       "89.90000",
@@ -618,86 +700,16 @@ test("renders and round-trips a selected location at the pole", async ({
       "0.00000",
     );
   }
-
-  const globe = page.locator("#globe-map");
-  const screenshot = await globe.screenshot();
-  const marker = await page.evaluate(
-    async (source) => {
-      const image = new Image();
-      image.src = source;
-      await image.decode();
-      const canvas = document.createElement("canvas");
-      canvas.width = image.width;
-      canvas.height = image.height;
-      const context = canvas.getContext("2d");
-      if (!context) throw new Error("Canvas 2D context unavailable.");
-      context.drawImage(image, 0, 0);
-      const pixels = context.getImageData(
-        0,
-        0,
-        canvas.width,
-        canvas.height,
-      ).data;
-      let count = 0;
-      let totalX = 0;
-      let totalY = 0;
-      for (let y = 0; y < canvas.height; y += 1) {
-        for (let x = 0; x < canvas.width; x += 1) {
-          const index = (y * canvas.width + x) * 4;
-          if (
-            Math.abs(pixels[index]! - 37) <= 3 &&
-            Math.abs(pixels[index + 1]! - 109) <= 3 &&
-            Math.abs(pixels[index + 2]! - 103) <= 3
-          ) {
-            count += 1;
-            totalX += x;
-            totalY += y;
-          }
-        }
-      }
-      return {
-        count,
-        x: totalX / count,
-        y: totalY / count,
-      };
-    },
-    `data:image/png;base64,${screenshot.toString("base64")}`,
-  );
-  expect(marker.count).toBeGreaterThan(20);
-
-  const box = await globe.boundingBox();
-  expect(box).not.toBeNull();
-  await page.mouse.click(box!.x + marker.x, box!.y + marker.y);
-  await expect
-    .poll(async () =>
-      Number(
-        (await globe.getAttribute("data-selected-latitude")) ?? -90,
-      ),
-    )
-    .toBeGreaterThan(89.5);
-
-  const latitude = await globe.getAttribute("data-selected-latitude");
-  const longitude = await globe.getAttribute("data-selected-longitude");
-  for (const id of ["mercator-map", "world-map"]) {
-    await expect(page.locator(`#${id}`)).toHaveAttribute(
-      "data-selected-latitude",
-      latitude!,
-    );
-    await expect(page.locator(`#${id}`)).toHaveAttribute(
-      "data-selected-longitude",
-      longitude!,
-    );
-  }
 });
 
-test("applies one layer toggle to all renderers", async ({ page }) => {
+test("applies one layer toggle to both surface renderers", async ({ page }) => {
   await page.goto("/browse/?eclipse=solar-2026-08-12-total");
   await expect(
     page.getByText("track calculated from", { exact: false }),
   ).toBeVisible();
 
   await page.getByLabel("Central path", { exact: true }).uncheck();
-  for (const id of ["mercator-map", "globe-map", "world-map"]) {
+  for (const id of ["mercator-map", "world-map"]) {
     await expect(page.locator(`#${id}`)).toHaveAttribute(
       "data-layer-central-path",
       "false",
@@ -745,10 +757,8 @@ test("keeps Leaflet maps usable when WebGL is unavailable", async ({
   });
   await page.goto("/browse/?eclipse=solar-2026-08-12-total");
   await expect(
-    page.locator("#globe-map").getByText("globe is unavailable", {
-      exact: false,
-    }),
-  ).toBeVisible();
+    page.locator("#spacefarer-status"),
+  ).toHaveText("The physical Spacefarer view is unavailable in this browser.");
   await expect(page.locator("#mercator-map")).toHaveAttribute(
     "data-renderer-ready",
     "true",
@@ -780,10 +790,18 @@ test("renders both 2027 central tracks through horizon singularities", async ({
   await expect(
     page.getByText("Annular track calculated from", { exact: false }),
   ).toBeVisible();
+  await expect(page.locator("#spacefarer-view")).toHaveAttribute(
+    "data-event-id",
+    "solar-2027-02-06-annular",
+  );
   await page.getByRole("button", { name: /Total 2 August 2027/ }).click();
   await expect(
     page.getByText("Total track calculated from", { exact: false }),
   ).toBeVisible();
+  await expect(page.locator("#spacefarer-view")).toHaveAttribute(
+    "data-event-id",
+    "solar-2027-08-02-total",
+  );
 });
 
 test("fits antimeridian tracks in one continuous Leaflet world", async ({
@@ -801,19 +819,21 @@ test("fits antimeridian tracks in one continuous Leaflet world", async ({
   expect(longitude).toBeLessThan(200);
 });
 
-test("stacks the projection panels on a narrow screen", async ({ page }) => {
+test("stacks the view panels on a narrow screen", async ({ page }) => {
   await page.setViewportSize({ width: 640, height: 900 });
   await page.goto("/browse/?eclipse=solar-2026-08-12-total");
-  await expect(page.locator("#globe-map")).toHaveAttribute(
+  await expect(page.locator("#spacefarer-view")).toHaveAttribute(
     "data-renderer-ready",
     "true",
   );
   const mercator = await page.locator(".mercator-panel").boundingBox();
-  const globe = await page.locator(".globe-panel").boundingBox();
+  const spacefarer = await page.locator(".spacefarer-map-panel").boundingBox();
   const world = await page.locator(".world-panel").boundingBox();
   expect(mercator).not.toBeNull();
-  expect(globe).not.toBeNull();
+  expect(spacefarer).not.toBeNull();
   expect(world).not.toBeNull();
-  expect(globe!.y).toBeGreaterThan(mercator!.y + mercator!.height - 2);
-  expect(world!.y).toBeGreaterThan(globe!.y + globe!.height - 2);
+  expect(spacefarer!.y).toBeGreaterThan(mercator!.y + mercator!.height - 2);
+  expect(world!.y).toBeGreaterThan(
+    spacefarer!.y + spacefarer!.height - 2,
+  );
 });

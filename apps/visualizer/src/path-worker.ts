@@ -207,24 +207,28 @@ self.addEventListener("message", (message: MessageEvent<WorkerRequest>) => {
       return;
     }
     const selected = engine.localCircumstances(request.event, request.observer);
+    const atUtc = selected?.peak.utc ?? request.event.peakUtc;
     let shadowScene: EclipseScene | null = null;
-    if (selected) {
-      try {
-        shadowScene = engine.calculateEvent(request.event, {
-          centralPath: false,
-          globalVisibility: false,
-          instantaneousAtUtc: [selected.peak.utc],
-          timeMarkers: false,
-        });
-      } catch {
-        // Local circumstances remain useful when an outline is singular
-        // extremely close to a horizon contact.
-      }
+    try {
+      shadowScene = engine.calculateEvent(request.event, {
+        centralPath: false,
+        globalVisibility: false,
+        instantaneousAtUtc: [atUtc],
+        timeMarkers: false,
+        shadow: { angularIntervalDegrees: 0.5 },
+      });
+    } catch {
+      // Local circumstances remain useful when an outline is singular
+      // extremely close to a horizon contact.
     }
     self.postMessage({
       id: request.id,
       ok: true,
-      result: { selected, shadowScene },
+      result: {
+        selected,
+        shadowScene,
+        atUtc: shadowScene?.instantaneousShadows[0]?.atUtc ?? atUtc,
+      },
     });
   } catch (error) {
     self.postMessage({
