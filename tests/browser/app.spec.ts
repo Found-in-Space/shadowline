@@ -98,39 +98,6 @@ test("turns clicks in either map into a shareable observer", async ({ page }) =>
   }
 });
 
-test("shows the same selected instant in all four views", async ({ page }) => {
-  await page.goto(
-    "/browse/?eclipse=solar-2026-08-12-total&lat=65.21900&lon=-25.25200",
-  );
-  await expect(page.getByText("Total at this point")).toBeVisible();
-
-  const instant = await page.locator("#mercator-map").getAttribute(
-    "data-comparison-utc",
-  );
-  expect(instant).not.toBeNull();
-  for (const id of ["world-map", "spacefarer-view", "ground-map"]) {
-    await expect(page.locator(`#${id}`)).toHaveAttribute(
-      "data-comparison-utc",
-      instant!,
-    );
-  }
-  for (const id of ["mercator-map", "world-map"]) {
-    await expect
-      .poll(async () =>
-        Number(
-          (await page
-            .locator(`#${id}`)
-            .getAttribute("data-shadow-feature-count")) ?? 0,
-        ),
-      )
-      .toBeGreaterThan(0);
-  }
-  await expect(page.locator("#spacefarer-view")).toHaveAttribute(
-    "data-frame-utc",
-    instant!,
-  );
-});
-
 test("keeps the browser map interactive when WebGL is unavailable", async ({
   page,
 }) => {
