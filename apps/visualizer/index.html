@@ -119,6 +119,11 @@
             <h2 class="map-panel-label" id="world-heading">NASA Blue Marble · Equirectangular</h2>
             <div id="world-map" class="map-viewport" tabindex="0" data-projection="equirectangular"></div>
           </article>
+          <article class="map-panel ground-panel" aria-labelledby="ground-heading">
+            <h2 class="map-panel-label" id="ground-heading">Terrain · Ground view</h2>
+            <div id="ground-map" class="map-viewport ground-viewport" tabindex="0" data-projection="ground"></div>
+            <p id="ground-status" class="ground-status" role="status" aria-live="polite">Choose a point on any map to prepare the view from the ground.</p>
+          </article>
         </div>
         <button
           id="sidebar-toggle"

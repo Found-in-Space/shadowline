@@ -11,6 +11,8 @@ import {
   type ProviderMetadata,
 } from "@found-in-space/shadowline";
 import { EclipseMapWorkspace } from "./map-workspace.js";
+import { solarDiscGeometry } from "./tracker-astronomy.js";
+import { TrackerGroundView } from "./tracker-ground-view.js";
 import {
   DEFAULT_LAYER_VISIBILITY,
   ECLIPSE_LAYER_KEYS,
@@ -78,6 +80,7 @@ const locationResults = element<HTMLDivElement>("location-results");
 const sidebar = element<HTMLElement>("sidebar");
 const sidebarToggle = element<HTMLButtonElement>("sidebar-toggle");
 const sidebarClose = element<HTMLButtonElement>("sidebar-close");
+const groundStatus = element<HTMLParagraphElement>("ground-status");
 
 const nowUtc = new Date().toISOString();
 let locatorMode: LocatorMode = "date";
@@ -116,6 +119,15 @@ const map = new EclipseMapWorkspace(
   },
   readMapView(),
 );
+const ground = new TrackerGroundView(element("ground-map"), {
+  onStatus: (message) => {
+    groundStatus.textContent = message;
+    groundStatus.hidden =
+      message.startsWith("Ground view ready") ||
+      message.startsWith("Terrain is ready");
+  },
+});
+ground.setActive(true);
 map.onLocation = (observer) => {
   setSelectedObserver(observer);
 };
@@ -592,6 +604,21 @@ function formatDuration(seconds: number): string {
   return `${minutes}m ${(seconds - minutes * 60).toFixed(1)}s`;
 }
 
+function updateGroundVisual(
+  event: EclipseSummary,
+  observer: Observer,
+  local: LocalEclipse | null,
+): void {
+  const peakMs = Date.parse(local?.peak.utc ?? event.peakUtc);
+  const fallbackRadiusMs = 3 * 60 * 60 * 1000;
+  ground.setLocation(
+    observer,
+    local ? Date.parse(local.partialBegin.utc) : peakMs - fallbackRadiusMs,
+    local ? Date.parse(local.partialEnd.utc) : peakMs + fallbackRadiusMs,
+  );
+  ground.setTime(solarDiscGeometry(observer, new Date(peakMs)));
+}
+
 async function calculateSelectedLocation(observer: Observer): Promise<void> {
   const version = ++locationVersion;
   const event = selectedEvent;
@@ -603,6 +630,7 @@ async function calculateSelectedLocation(observer: Observer): Promise<void> {
   try {
     const result = await worker.calculateLocation(event, observer);
     if (version !== locationVersion || event.id !== selectedEvent.id) return;
+    updateGroundVisual(event, observer, result.selected);
     map.showShadowOutline(result.shadowScene);
     locationResults.innerHTML = `<div class="place-coordinate">
         <span>Selected point</span>
@@ -616,6 +644,7 @@ async function calculateSelectedLocation(observer: Observer): Promise<void> {
       }`;
   } catch (error) {
     if (version !== locationVersion) return;
+    updateGroundVisual(event, observer, null);
     locationResults.innerHTML = `<div class="place-coordinate">
         <span>Selected point</span>
         <strong>${observer.latitudeDeg.toFixed(5)}°, ${observer.longitudeDeg.toFixed(5)}°</strong>
@@ -626,6 +655,8 @@ async function calculateSelectedLocation(observer: Observer): Promise<void> {
 function setSelectedObserver(observer: Observer): void {
   selectedObserver = observer;
   map.setLocation(observer);
+  ground.setLocationPending(observer);
+  ground.setTime(null);
   renderTimeline();
   writeUrlState();
   if (selectedEvent) void calculateSelectedLocation(observer);
@@ -644,6 +675,10 @@ async function selectEvent(event: EclipseSummary): Promise<void> {
   const version = ++selectionVersion;
   locationVersion += 1;
   selectedEvent = event;
+  if (selectedObserver) {
+    ground.setLocationPending(selectedObserver);
+    ground.setTime(null);
+  }
   rememberEvents([event]);
   renderTimeline();
   selectedScene = null;

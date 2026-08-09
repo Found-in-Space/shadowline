@@ -633,10 +633,6 @@ footer a {
   background: #d8d3dc;
 }
 
-.world-panel {
-  grid-column: 1 / -1;
-}
-
 .map-panel > .map-viewport {
   position: absolute;
   inset: 0;
@@ -646,6 +642,62 @@ footer a {
 
 #world-map {
   background: #a9d3e2;
+}
+
+.ground-viewport {
+  background: #111624;
+}
+
+.tracker-ground-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.ground-bearing,
+.ground-attribution {
+  position: absolute;
+  z-index: 700;
+  padding: 5px 7px;
+  color: #d7ddeb;
+  background: rgb(7 10 17 / 68%);
+  pointer-events: none;
+  font-size: 0.6rem;
+  line-height: 1.35;
+}
+
+.ground-bearing {
+  top: 43px;
+  left: 9px;
+  border-radius: 7px;
+  font-weight: 800;
+}
+
+.ground-attribution {
+  right: 0;
+  bottom: 0;
+  max-width: 48%;
+  text-align: right;
+}
+
+.ground-status {
+  position: absolute;
+  z-index: 800;
+  bottom: 9px;
+  left: 9px;
+  width: min(310px, calc(100% - 40px));
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 7px;
+  color: #eef1f8;
+  background: rgb(7 10 17 / 78%);
+  pointer-events: none;
+  font-size: 0.65rem;
+  line-height: 1.4;
+}
+
+.ground-status[hidden] {
+  display: none;
 }
 
 .map-panel-label {
@@ -758,8 +810,7 @@ footer a {
     min-height: 100%;
   }
 
-  .map-panel,
-  .world-panel {
+  .map-panel {
     grid-column: 1;
     width: 100%;
     height: 55vh;
