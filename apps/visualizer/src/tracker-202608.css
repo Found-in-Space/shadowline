@@ -362,7 +362,7 @@ h2 { margin: 0; font-size: 1.15rem; letter-spacing: -0.025em; }
 .globe-card { overflow: hidden; }
 .globe-heading { padding: 17px 15px 12px; }
 .drag-hint { align-self: flex-end; color: var(--muted); font-size: 0.58rem; white-space: nowrap; }
-.overview-tabs { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; padding: 0 14px 12px; }
+.overview-tabs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 5px; padding: 0 14px 12px; }
 .overview-tabs button {
   min-height: 38px;
   border: 1px solid var(--line);
@@ -396,6 +396,21 @@ h2 { margin: 0; font-size: 1.15rem; letter-spacing: -0.025em; }
 .tracker-overview-pane { position: relative; width: 100%; height: min(64vh, 480px); min-height: 330px; background: #111624; }
 .tracker-overview-pane[hidden] { display: none; }
 .tracker-shadow canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+.tracker-ground-canvas { display: block; width: 100%; height: 100%; }
+.ground-bearing,
+.ground-attribution {
+  position: absolute;
+  z-index: 2;
+  padding: 5px 7px;
+  color: rgb(239 244 250 / 82%);
+  background: rgb(7 10 17 / 62%);
+  font-size: 0.52rem;
+  line-height: 1.3;
+  pointer-events: none;
+  backdrop-filter: blur(7px);
+}
+.ground-bearing { top: 9px; left: 9px; border-radius: 7px; font-weight: 800; }
+.ground-attribution { right: 0; bottom: 0; max-width: 75%; text-align: right; }
 .shadow-camera-controls { position: absolute; z-index: 2; top: 10px; left: 10px; display: flex; gap: 5px; }
 .shadow-camera-controls button {
   min-height: 32px;

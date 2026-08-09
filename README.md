@@ -78,6 +78,22 @@ locally. Standard OpenStreetMap raster tiles are requested over the network for
 the two interactive top views, and the fixed whole-Earth view requests NASA
 Blue Marble imagery from GIBS's cacheable geographic WMTS service.
 
+The 2026 eclipse tracker also has a location-fixed Ground view. Elevation tiles
+are requested directly from Mapterhorn. To add MapTiler Satellite photography,
+copy `apps/visualizer/.env.example` to `apps/visualizer/.env.local` and set
+`VITE_MAPTILER_KEY`. A complete direct XYZ template and attribution can be
+configured instead. These requests are made by the browser directly to the
+providers; Shadowline does not use a tile proxy.
+
+The GitHub Pages workflow reads the complete production imagery configuration
+from repository-level GitHub Actions variables named
+`VITE_GROUND_IMAGERY_XYZ_TEMPLATE`, `VITE_GROUND_IMAGERY_ATTRIBUTION`,
+`VITE_GROUND_IMAGERY_TILE_SIZE`, and `VITE_GROUND_IMAGERY_MAX_ZOOM`. These are
+configuration variables rather than secrets because Vite embeds them in the
+public browser bundle. Restrict any provider token contained in the template to
+the deployed site's origin and apply an appropriate usage limit at the
+provider.
+
 The production output is written to `dist/site`. The equivalent convenience
 commands are available through [`just`](https://just.systems/):
 

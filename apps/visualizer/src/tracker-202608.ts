@@ -10,6 +10,7 @@ import type {
 import { ecefToGeodetic } from "@found-in-space/shadowline";
 import { MapLibreGlobeRenderer } from "./maplibre-renderer.js";
 import type { LeafletMercatorRenderer } from "./leaflet-renderer.js";
+import type { TrackerGroundView } from "./tracker-ground-view.js";
 import type { TrackerShadowView } from "./tracker-shadow-view.js";
 import {
   configureOperationalDeltaT202608,
@@ -23,6 +24,8 @@ import { TrackerWorkerClient } from "./tracker-worker-client.js";
 const CLOCK_URL = "https://data.foundin.space/api/v1/time";
 const LOCATION_URL = "https://data.foundin.space/api/v1/location";
 const LOCATION_STORAGE_KEY = "shadowline-tracker-202608-location";
+const ELEVATION_SOURCE_STORAGE_KEY =
+  "shadowline-tracker-202608-elevation-source";
 const CLOCK_STORAGE_KEY = "shadowline-tracker-202608-clock";
 const CLOCK_CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 const CLOCK_RESYNC_INTERVAL_MS = 5 * 60 * 1000;
@@ -38,7 +41,8 @@ interface NamedContact {
 }
 
 type LocationSource = "gps" | "geoip" | "manual" | "map" | "saved";
-type OverviewView = "globe" | "map" | "shadow";
+type ElevationSource = "explicit" | "gps" | "terrain" | "pending";
+type OverviewView = "globe" | "map" | "shadow" | "ground";
 
 interface ApproximateLocationResponse {
   available?: unknown;
@@ -93,11 +97,13 @@ const overviewTabs: Record<OverviewView, HTMLButtonElement> = {
   globe: element<HTMLButtonElement>("globe-tab"),
   map: element<HTMLButtonElement>("map-tab"),
   shadow: element<HTMLButtonElement>("shadow-tab"),
+  ground: element<HTMLButtonElement>("ground-tab"),
 };
 const overviewPanes: Record<OverviewView, HTMLElement> = {
   globe: element("tracker-globe"),
   map: element("tracker-map"),
   shadow: element("tracker-shadow"),
+  ground: element("tracker-ground"),
 };
 
 configureOperationalDeltaT202608();
@@ -133,13 +139,17 @@ let lastDiscBucket = Number.NaN;
 let activeOverviewView: OverviewView = "globe";
 let mercator: LeafletMercatorRenderer | null = null;
 let shadowView: TrackerShadowView | null = null;
+let groundView: TrackerGroundView | null = null;
 let mapFollowingShadow = true;
 let instantaneousScene: EclipseScene | null = null;
+let currentSolarGeometry: ReturnType<typeof solarDiscGeometry> | null = null;
 let globeOverviewStatus = "Working out the eclipse path…";
 let shadowOverviewStatus = "Preparing the physical shadow view…";
+let groundOverviewStatus = "Choose a location to prepare the view from the ground.";
 let offlineCoreReady = false;
 let mercatorModulePromise: Promise<typeof import("./leaflet-renderer.js")> | null = null;
 let shadowModulePromise: Promise<typeof import("./tracker-shadow-view.js")> | null = null;
+let groundModulePromise: Promise<typeof import("./tracker-ground-view.js")> | null = null;
 
 function loadMercatorModule(): Promise<typeof import("./leaflet-renderer.js")> {
   mercatorModulePromise ??= import("./leaflet-renderer.js");
@@ -149,6 +159,11 @@ function loadMercatorModule(): Promise<typeof import("./leaflet-renderer.js")> {
 function loadShadowModule(): Promise<typeof import("./tracker-shadow-view.js")> {
   shadowModulePromise ??= import("./tracker-shadow-view.js");
   return shadowModulePromise;
+}
+
+function loadGroundModule(): Promise<typeof import("./tracker-ground-view.js")> {
+  groundModulePromise ??= import("./tracker-ground-view.js");
+  return groundModulePromise;
 }
 
 function currentTrackerTime(): number {
@@ -198,8 +213,8 @@ function followMercatorShadow(scene = instantaneousScene): void {
 }
 
 function updateFollowControl(): void {
-  overviewFollow.hidden = activeOverviewView === "globe";
-  if (activeOverviewView === "globe") return;
+  overviewFollow.hidden = activeOverviewView === "globe" || activeOverviewView === "ground";
+  if (activeOverviewView === "globe" || activeOverviewView === "ground") return;
   const following = activeOverviewView === "map"
     ? mapFollowingShadow
     : shadowView?.isFollowingShadow() ?? true;
@@ -229,7 +244,7 @@ function showOverviewStatus(): void {
     overviewHint.textContent = mapFollowingShadow
       ? "Drag or zoom to hold another view · tap to choose"
       : "Drag to move · pinch to zoom · tap to choose";
-  } else {
+  } else if (activeOverviewView === "shadow") {
     const following = shadowView?.isFollowingShadow() ?? true;
     globeStatus.textContent = following
       ? shadowOverviewStatus
@@ -237,6 +252,11 @@ function showOverviewStatus(): void {
     overviewHint.textContent = following
       ? "Drag or zoom to hold another view"
       : "Drag to turn · pinch to zoom";
+  } else {
+    globeStatus.textContent = groundOverviewStatus;
+    overviewHint.textContent = observer
+      ? "Fixed view from your chosen location"
+      : "Choose a location on the globe or map first";
   }
 }
 
@@ -293,6 +313,23 @@ async function ensureShadowView(): Promise<TrackerShadowView> {
   return shadowView;
 }
 
+async function ensureGroundView(): Promise<TrackerGroundView> {
+  if (groundView) return groundView;
+  const module = await loadGroundModule();
+  groundView = new module.TrackerGroundView(overviewPanes.ground, {
+    onStatus: (message) => {
+      groundOverviewStatus = message;
+      if (activeOverviewView === "ground") showOverviewStatus();
+    },
+  });
+  groundView.setTime(currentSolarGeometry);
+  if (observer) {
+    if (localCalculationPending) groundView.setLocationPending(observer);
+    else groundView.setLocation(observer, rangeStartMs, rangeEndMs);
+  }
+  return groundView;
+}
+
 async function selectOverviewView(view: OverviewView, focus = false): Promise<void> {
   activeOverviewView = view;
   for (const [name, tab] of Object.entries(overviewTabs) as [OverviewView, HTMLButtonElement][]) {
@@ -302,6 +339,7 @@ async function selectOverviewView(view: OverviewView, focus = false): Promise<vo
     overviewPanes[name].hidden = !selected;
   }
   shadowView?.setActive(view === "shadow");
+  groundView?.setActive(view === "ground");
   updateFollowControl();
   showOverviewStatus();
   try {
@@ -311,13 +349,20 @@ async function selectOverviewView(view: OverviewView, focus = false): Promise<vo
       renderer.setActive(true);
       renderer.setTime(currentTrackerTime());
     }
+    if (view === "ground") {
+      const renderer = await ensureGroundView();
+      renderer.setActive(true);
+      renderer.setTime(currentSolarGeometry);
+    }
     updateFollowControl();
     showOverviewStatus();
   } catch (error) {
     console.error(error);
     globeStatus.textContent = view === "map"
       ? "The map could not load. The globe is still available."
-      : "The physical shadow view could not load. The globe is still available.";
+      : view === "shadow"
+        ? "The physical shadow view could not load. The globe is still available."
+        : "The ground view could not load. The other views are still available.";
   }
   if (focus) overviewPanes[view].focus({ preventScroll: true });
 }
@@ -351,11 +396,12 @@ function scheduleOptionalViewPreload(): void {
     scheduleWhenIdle(() => loadMercatorModule(), 2_000);
     scheduleWhenIdle(async () => {
       await loadMercatorModule();
+      await loadGroundModule();
       const module = await loadShadowModule();
       await module.preloadTrackerShadowAssets();
       document.documentElement.dataset.optionalViewsReady = "true";
       if (offlineCoreReady) {
-        offlineStatus.textContent = "Ready for a poor connection. All three views are saved; places you view on the map are saved as you go.";
+        offlineStatus.textContent = "Ready for a poor connection. All four views are saved; terrain for places you open is saved as it loads.";
       }
     }, 7_000);
   };
@@ -379,6 +425,20 @@ function coordinateInputValue(value: number): string {
   // Five decimal places resolve to roughly one metre of latitude, which is
   // already finer than a phone location while avoiding raw GPS float noise.
   return String(Number(value.toFixed(5)));
+}
+
+function updateElevationInput(
+  observerValue: Observer,
+  source: ElevationSource,
+): void {
+  const calculated = source === "terrain" || source === "pending";
+  elevationInput.value = calculated
+    ? ""
+    : String(Math.round(observerValue.elevationMeters ?? 0));
+  elevationInput.placeholder = source === "terrain"
+    ? `Calculated: ${Math.round(observerValue.elevationMeters ?? 0)} m`
+    : "Calculated if blank";
+  elevationInput.dataset.source = source;
 }
 
 function compassDirection(degrees: number): string {
@@ -541,6 +601,8 @@ function renderContactList(atMs: number): void {
 
 function renderDisc(atMs: number): void {
   if (!observer) {
+    currentSolarGeometry = null;
+    groundView?.setTime(null);
     obscurationValue.textContent = "—";
     phaseLabel.textContent = "Choose your location";
     solarPreview.clear();
@@ -551,6 +613,8 @@ function renderDisc(atMs: number): void {
   }
   try {
     const geometry = solarDiscGeometry(observer, new Date(atMs));
+    currentSolarGeometry = geometry;
+    groundView?.setTime(geometry);
     const horizon = solarHorizonGeometry(
       geometry.sunAltitudeDeg,
       geometry.sunRadiusDeg,
@@ -581,6 +645,8 @@ function renderDisc(atMs: number): void {
     );
   } catch (error) {
     console.error(error);
+    currentSolarGeometry = null;
+    groundView?.setTime(null);
     phaseLabel.textContent = "Preview unavailable";
   }
 }
@@ -666,11 +732,19 @@ async function setObserver(
   source: LocationSource,
   refineTerrain = false,
   elevationDetail = "",
+  elevationSource: ElevationSource = refineTerrain
+    ? "pending"
+    : source === "gps"
+      ? "gps"
+      : "explicit",
 ): Promise<void> {
   const version = ++locationVersion;
   observer = nextObserver;
   localEclipse = null;
   localCalculationPending = true;
+  currentSolarGeometry = null;
+  groundView?.setLocationPending(nextObserver);
+  groundView?.setTime(null);
   globe.setLocation(nextObserver);
   mercator?.setLocation(nextObserver);
   locationLabel.textContent = source === "gps"
@@ -686,15 +760,25 @@ async function setObserver(
   locationMessage.textContent = "Working out what the eclipse will look like here…";
   latitudeInput.value = coordinateInputValue(nextObserver.latitudeDeg);
   longitudeInput.value = coordinateInputValue(nextObserver.longitudeDeg);
-  elevationInput.value = String(Math.round(nextObserver.elevationMeters ?? 0));
+  updateElevationInput(nextObserver, elevationSource);
   if (source !== "geoip") {
     localStorage.setItem(LOCATION_STORAGE_KEY, JSON.stringify(nextObserver));
+    localStorage.setItem(
+      ELEVATION_SOURCE_STORAGE_KEY,
+      elevationSource === "pending" ? "terrain" : elevationSource,
+    );
   }
   const url = new URL(location.href);
   url.searchParams.set("lat", nextObserver.latitudeDeg.toFixed(6));
   url.searchParams.set("lon", nextObserver.longitudeDeg.toFixed(6));
-  if (nextObserver.elevationMeters) url.searchParams.set("elevation", String(Math.round(nextObserver.elevationMeters)));
-  else url.searchParams.delete("elevation");
+  if (elevationSource === "explicit" || elevationSource === "gps") {
+    url.searchParams.set(
+      "elevation",
+      String(Math.round(nextObserver.elevationMeters ?? 0)),
+    );
+  } else {
+    url.searchParams.delete("elevation");
+  }
   if (source === "geoip") url.searchParams.set("location", "geoip");
   else url.searchParams.delete("location");
   history.replaceState(null, "", url);
@@ -706,14 +790,14 @@ async function setObserver(
     ).then((elevationMeters) => {
       if (
         version !== locationVersion ||
-        !Number.isFinite(elevationMeters) ||
-        Math.abs(elevationMeters - (nextObserver.elevationMeters ?? 0)) < 0.5
+        !Number.isFinite(elevationMeters)
       ) return;
       void setObserver(
         { ...nextObserver, elevationMeters },
         source,
         false,
         `The terrain map puts this location about ${Math.round(elevationMeters)} m above sea level.`,
+        "terrain",
       );
     }).catch(() => {
       // Local circumstances already use the supplied height, so terrain
@@ -732,11 +816,13 @@ async function setObserver(
       ? `${result.local.kind === "total" ? "You can see totality" : "You can see a partial eclipse"} from this location.${approximationDetail}${elevationDetail ? ` ${elevationDetail}` : ""}`
       : `The eclipse will not be visible from this location.${approximationDetail}${elevationDetail ? ` ${elevationDetail}` : ""}`;
     updateRange();
+    groundView?.setLocation(nextObserver, rangeStartMs, rangeEndMs);
     renderFrame();
   } catch (error) {
     if (version !== locationVersion) return;
     console.error(error);
     localCalculationPending = false;
+    groundView?.setLocation(nextObserver, rangeStartMs, rangeEndMs);
     locationMessage.textContent = "We could not work out the eclipse times. Try again or choose another location.";
   }
 }
@@ -809,6 +895,13 @@ function savedObserver(): Observer | null {
   } catch {
     return null;
   }
+}
+
+function savedElevationSource(): ElevationSource {
+  const value = localStorage.getItem(ELEVATION_SOURCE_STORAGE_KEY);
+  return value === "gps" || value === "terrain" || value === "explicit"
+    ? value
+    : "explicit";
 }
 
 function restorePreviewFromUrl(): void {
@@ -891,6 +984,10 @@ async function initializeModel(): Promise<void> {
         initialObserver,
         source,
         Boolean(urlObserver && !hasUrlElevation),
+        "",
+        urlObserver
+          ? hasUrlElevation ? "explicit" : "pending"
+          : savedElevationSource(),
       );
     } else {
       void resolveApproximateLocation();
@@ -974,8 +1071,8 @@ async function prepareOffline(): Promise<void> {
     await navigator.serviceWorker.ready;
     offlineCoreReady = true;
     offlineStatus.textContent = document.documentElement.dataset.optionalViewsReady === "true"
-      ? "Ready for a poor connection. All three views are saved; places you view on the map are saved as you go."
-      : "The main tracker is ready for a poor connection. The map and shadow views will be saved quietly while you are online.";
+      ? "Ready for a poor connection. All four views are saved; terrain for places you open is saved as it loads."
+      : "The main tracker is ready for a poor connection. The map, shadow and ground views will be saved quietly while you are online.";
   } catch {
     offlineStatus.textContent = "Offline setup did not finish. Keep this page open if your connection may drop.";
   }
@@ -1044,7 +1141,7 @@ globe.onLocation = (selected) => {
   void setObserver(selected, "map", true);
 };
 
-const overviewViewOrder: OverviewView[] = ["globe", "map", "shadow"];
+const overviewViewOrder: OverviewView[] = ["globe", "map", "shadow", "ground"];
 for (const [view, tab] of Object.entries(overviewTabs) as [OverviewView, HTMLButtonElement][]) {
   tab.addEventListener("click", () => {
     void selectOverviewView(view);

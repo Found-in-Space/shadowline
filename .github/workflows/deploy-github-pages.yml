@@ -39,6 +39,11 @@ jobs:
         run: npm run check
 
       - name: Build visualizer
+        env:
+          VITE_GROUND_IMAGERY_XYZ_TEMPLATE: ${{ vars.VITE_GROUND_IMAGERY_XYZ_TEMPLATE }}
+          VITE_GROUND_IMAGERY_ATTRIBUTION: ${{ vars.VITE_GROUND_IMAGERY_ATTRIBUTION }}
+          VITE_GROUND_IMAGERY_TILE_SIZE: ${{ vars.VITE_GROUND_IMAGERY_TILE_SIZE }}
+          VITE_GROUND_IMAGERY_MAX_ZOOM: ${{ vars.VITE_GROUND_IMAGERY_MAX_ZOOM }}
         run: npm run build
 
       - name: Upload Pages artifact

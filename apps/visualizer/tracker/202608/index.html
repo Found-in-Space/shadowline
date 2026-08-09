@@ -60,7 +60,7 @@
           <form id="manual-location" class="manual-location" hidden>
             <label>Latitude <input id="latitude-input" type="number" min="-90" max="90" step="any" inputmode="decimal" required></label>
             <label>Longitude <input id="longitude-input" type="number" min="-180" max="180" step="any" inputmode="decimal" required></label>
-            <label>Height above sea level (m) <input id="elevation-input" type="number" min="-500" max="100000" step="1" inputmode="numeric" placeholder="Estimated if online"></label>
+            <label>Height above sea level (m, optional) <input id="elevation-input" type="number" min="-500" max="100000" step="1" inputmode="numeric" placeholder="Calculated if blank"></label>
             <button class="primary-button" type="submit">Use this location</button>
           </form>
           <p id="location-message" class="inline-message" role="status" aria-live="polite"></p>
@@ -130,6 +130,7 @@
             <button id="globe-tab" type="button" role="tab" aria-selected="true" aria-controls="tracker-globe">Globe</button>
             <button id="map-tab" type="button" role="tab" aria-selected="false" aria-controls="tracker-map" tabindex="-1">Map</button>
             <button id="shadow-tab" type="button" role="tab" aria-selected="false" aria-controls="tracker-shadow" tabindex="-1">Shadow</button>
+            <button id="ground-tab" type="button" role="tab" aria-selected="false" aria-controls="tracker-ground" tabindex="-1">Ground</button>
           </div>
           <div class="overview-stage">
             <button id="overview-follow" class="overview-follow" type="button" aria-pressed="true" hidden>Following shadow</button>
@@ -137,6 +138,9 @@
             <div id="tracker-map" class="tracker-overview-pane tracker-map" role="tabpanel" aria-labelledby="map-tab" tabindex="0" hidden></div>
             <div id="tracker-shadow" class="tracker-overview-pane tracker-shadow" role="tabpanel" aria-labelledby="shadow-tab" tabindex="0" hidden>
               <p class="overview-placeholder">Preparing the physical shadow view…</p>
+            </div>
+            <div id="tracker-ground" class="tracker-overview-pane tracker-ground" role="tabpanel" aria-labelledby="ground-tab" tabindex="0" hidden>
+              <p class="overview-placeholder">Choose a location to prepare the view from the ground.</p>
             </div>
           </div>
           <p id="globe-status" class="globe-status" role="status">Working out the eclipse path…</p>

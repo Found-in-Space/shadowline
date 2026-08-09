@@ -15,6 +15,14 @@ The global 30 m source is Copernicus GLO-30. Product information and licence
 terms are available at:
 https://dataspace.copernicus.eu/explore-data/data-collections/copernicus-contributing-missions/collections-description/COP-DEM
 
+MapTiler Satellite
+------------------
+
+When configured, the eclipse tracker's Ground view requests Satellite raster
+tiles directly from MapTiler. Provider and data attribution is displayed on
+the view. MapTiler service and data terms are available at:
+https://www.maptiler.com/terms/
+
 Leaflet 1.9.4
 -------------
 
