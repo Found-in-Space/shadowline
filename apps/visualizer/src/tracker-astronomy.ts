@@ -15,6 +15,7 @@ const AstronomyRuntime = (
 
 const {
   Body,
+  DeltaT_EspenakMeeus,
   Equator,
   Horizon,
   Observer: AstronomyObserver,
@@ -25,6 +26,10 @@ export const TRACKER_DELTA_T_SECONDS = 69.1734;
 
 export function configureOperationalDeltaT202608(): void {
   SetDeltaTFunction(() => TRACKER_DELTA_T_SECONDS);
+}
+
+export function configureGeneralDeltaT(): void {
+  SetDeltaTFunction(DeltaT_EspenakMeeus);
 }
 
 export interface SolarDiscGeometry {

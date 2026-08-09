@@ -6,7 +6,6 @@ import {
   LeafletEquirectangularRenderer,
   LeafletMercatorRenderer,
 } from "./leaflet-renderer.js";
-import { MapLibreGlobeRenderer } from "./maplibre-renderer.js";
 import {
   type EclipseLayerVisibility,
   type MapView,
@@ -15,13 +14,11 @@ import { EclipseRendererCoordinator } from "./renderer-coordinator.js";
 
 interface MapWorkspaceElements {
   mercator: HTMLElement;
-  globe: HTMLElement;
   world: HTMLElement;
 }
 
 export class EclipseMapWorkspace {
   readonly mercator: LeafletMercatorRenderer;
-  readonly globe: MapLibreGlobeRenderer;
   readonly world: LeafletEquirectangularRenderer;
   private readonly coordinator: EclipseRendererCoordinator;
   onLocation?: (observer: Observer) => void;
@@ -32,11 +29,9 @@ export class EclipseMapWorkspace {
       elements.mercator,
       initialView,
     );
-    this.globe = new MapLibreGlobeRenderer(elements.globe);
     this.world = new LeafletEquirectangularRenderer(elements.world);
     this.coordinator = new EclipseRendererCoordinator([
       this.mercator,
-      this.globe,
       this.world,
     ]);
     this.coordinator.onLocation = (observer) => {

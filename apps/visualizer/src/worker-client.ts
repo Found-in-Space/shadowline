@@ -20,6 +20,7 @@ interface LocalEventSearchResult {
 interface LocationResult {
   selected: LocalEclipse | null;
   shadowScene: EclipseScene | null;
+  atUtc: string;
 }
 
 interface EventGeometryResult {

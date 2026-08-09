@@ -5,8 +5,10 @@ import {
   MOON_RADIUS_KM,
   SUN_RADIUS_KM,
   type CartesianVector,
+  type EclipseSummary,
 } from "@found-in-space/shadowline";
 import {
+  WGS84_DISPLAY_EQUATORIAL_RADIUS,
   createGeodeticEllipsoidGeometry,
   ecefKmToDisplay,
 } from "./earth-ellipsoid.js";
@@ -143,7 +145,9 @@ export class TrackerShadowView {
   private requestId = 0;
   private requestInFlight = false;
   private queuedTimeMs: number | null = null;
-  private lastRequestedSecond = Number.NaN;
+  private lastRequestedTimeKey = Number.NaN;
+  private lastRequestedEventId = "";
+  private selectedEvent: EclipseSummary | null = null;
   private firstFrame = true;
   private moonPosition = new THREE.Vector3(-60, 0, 0);
   private shadowAxis = new THREE.Vector3(1, 0, 0);
@@ -230,8 +234,6 @@ export class TrackerShadowView {
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
     this.controls.enableDamping = true;
     this.controls.enablePan = false;
-    this.controls.minDistance = 2.4;
-    this.controls.maxDistance = 180;
     this.controls.target.set(0, 0, 0);
     this.controls.update();
     earthButton.addEventListener("click", () => this.applyCameraPreset("earth"));
@@ -245,7 +247,6 @@ export class TrackerShadowView {
     this.controls.addEventListener("end", () => {
       this.controlGestureActive = false;
     });
-
     this.resizeObserver = new ResizeObserver(() => this.resize());
     this.resizeObserver.observe(container);
     this.worker.addEventListener("message", (message: MessageEvent<WorkerResponse>) => {
@@ -271,10 +272,18 @@ export class TrackerShadowView {
     }
   }
 
-  setTime(timeMs: number): void {
-    const second = Math.floor(timeMs / 1000);
-    if (second === this.lastRequestedSecond) return;
-    this.lastRequestedSecond = second;
+  setTime(timeMs: number, event?: EclipseSummary): void {
+    if (event) this.selectedEvent = event;
+    const timeKey = event ? timeMs : Math.floor(timeMs / 1000);
+    const eventId = this.selectedEvent?.id ?? "";
+    if (
+      timeKey === this.lastRequestedTimeKey &&
+      eventId === this.lastRequestedEventId
+    ) {
+      return;
+    }
+    this.lastRequestedTimeKey = timeKey;
+    this.lastRequestedEventId = eventId;
     this.queuedTimeMs = timeMs;
     if (this.active) this.requestFrame();
   }
@@ -298,6 +307,7 @@ export class TrackerShadowView {
       type: "frame",
       requestId: this.requestId,
       atUtc,
+      event: this.selectedEvent ?? undefined,
       angularIntervalDegrees: 0.5,
     });
   }
@@ -314,6 +324,8 @@ export class TrackerShadowView {
   }
 
   private updateFrame(frame: SpacefarerFrame): void {
+    this.container.dataset.eventId = frame.event.id;
+    this.container.dataset.frameUtc = frame.atUtc;
     disposeLayer(this.coneLayer);
     disposeLayer(this.footprintLayer);
     const moonPosition = ecefKmToDisplay(frame.moonEcefKm);
@@ -398,8 +410,24 @@ export class TrackerShadowView {
     this.camera.near = preset === "system" ? 0.05 : 0.02;
     this.camera.far = VISIBLE_SUN_FAR;
     this.camera.updateProjectionMatrix();
+    this.updateControlSensitivity();
     this.controls.update();
     this.showCameraStatus();
+  }
+
+  private updateControlSensitivity(): void {
+    const targetDistance = this.camera.position.distanceTo(
+      this.controls.target,
+    );
+    const localScale = Math.hypot(
+      targetDistance - WGS84_DISPLAY_EQUATORIAL_RADIUS,
+      this.camera.near,
+    );
+    const sensitivity =
+      localScale /
+      Math.max(targetDistance, WGS84_DISPLAY_EQUATORIAL_RADIUS);
+    this.controls.zoomSpeed = sensitivity;
+    this.controls.rotateSpeed = sensitivity;
   }
 
   private showCameraStatus(): void {
@@ -420,6 +448,7 @@ export class TrackerShadowView {
 
   private render = (): void => {
     if (!this.active) return;
+    this.updateControlSensitivity();
     this.controls.update();
     this.visibleSun.update(
       this.camera,

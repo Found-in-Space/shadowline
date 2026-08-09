@@ -104,35 +104,37 @@ just setup
 just validate
 ```
 
-## Projection testbed
+## Visualisation testbed
 
-The visualizer deliberately renders every calculated feature through two
-separate map engines and three projections:
+The explorer deliberately presents four complementary views of the same
+eclipse:
 
-| Panel | Renderer | Projection and purpose |
+| Panel | Renderer | View and purpose |
 |---|---|---|
 | Top left | Leaflet | Web Mercator OpenStreetMap planning view |
-| Top right | MapLibre GL JS | Interactive spherical OpenStreetMap globe |
-| Bottom | Leaflet | Fixed EPSG:4326/equirectangular NASA whole-Earth view |
+| Top right | Three.js | Spacefarer physical Earth–Moon and shadow-cone view |
+| Bottom left | Leaflet | Fixed EPSG:4326/equirectangular NASA whole-Earth view |
+| Bottom right | Canvas | Local terrain and sky view for the selected observer |
 
-All three receive the same `EclipseScene`. ECEF WGS 84 points and their
-physical curve/region topology are canonical; longitude/latitude is a derived
-convenience on each point. Flat renderers call `toGeoJson` with their own seam
-and latitude policy. The globe uses signed cross-track limits, horizon-cap
-strips, partial-eclipse extent, instantaneous regions, and sunrise/sunset
-limits directly, so it does not reconstruct topology from RFC 7946 shards.
-Its custom fill, line, and point layers also
-retain latitudes above 85.051128° instead of feeding them through MapLibre's
-Web-Mercator-tiled GeoJSON path. The Mercator adapter alone selects an
-event-centred display seam and clips at the Web Mercator latitude limit. A
-click in any panel selects one observer, updates every marker, and starts one
-local-circumstances calculation. Layer visibility is shared, but the two
-interactive cameras remain independent.
+The two surface maps receive the same `EclipseScene`. ECEF WGS 84 points and
+their physical curve/region topology are canonical; longitude/latitude is a
+derived convenience on each point. Each flat renderer calls `toGeoJson` with
+its own seam and latitude policy. The Mercator adapter selects an event-centred
+display seam and clips at the Web Mercator latitude limit, while the whole-Earth
+view retains the complete equirectangular extent. Clicking either map selects
+one observer, updates both markers, and starts one local-circumstances
+calculation. Layer visibility is shared between them.
 
-MapLibre's globe is an Earth-surface renderer. Its projection-aware custom
-WebGL layers provide a future route to nearby 3D effects, but a correctly scaled
-Sun–Moon–Earth or XR scene will remain a separate astronomical Three.js
-consumer of the provider's frame-labelled state vectors.
+Before a place is selected, Spacefarer evaluates the eclipse at global peak.
+Selecting a point on either map moves all four views to that place’s local
+maximum. The two maps and Spacefarer then show
+the same instantaneous shadow footprint while the ground view shows the Sun at
+that exact UTC instant. Earth, Moon, their separation, and both shadow cones
+share one physical scale; the Sun is a distant celestial disc. Spacefarer
+starts in the same Sun–Earth-plane framing as the tracker and keeps that frame
+until the visitor deliberately moves the camera. The focused 2026 tracker
+retains an interactive MapLibre globe alongside its map, shadow, and ground
+tabs.
 
 ## Reproducible pipeline
 

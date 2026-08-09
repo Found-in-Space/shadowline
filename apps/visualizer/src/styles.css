@@ -644,6 +644,116 @@ footer a {
   background: #a9d3e2;
 }
 
+.spacefarer-viewport {
+  background:
+    radial-gradient(circle at 72% 32%, rgb(29 76 117 / 52%), transparent 25%),
+    radial-gradient(circle at 42% 56%, #111d33 0, #070b16 43%, #03050b 82%);
+}
+
+.spacefarer-viewport canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+}
+
+.spacefarer-viewport .shadow-camera-controls {
+  position: absolute;
+  z-index: 802;
+  top: 47px;
+  left: 9px;
+  display: flex;
+  gap: 5px;
+}
+
+.spacefarer-viewport .shadow-camera-controls button {
+  min-height: 30px;
+  padding: 5px 9px;
+  border: 1px solid rgb(255 255 255 / 18%);
+  border-radius: 8px;
+  color: #b7c0d1;
+  background: rgb(9 13 23 / 78%);
+  cursor: pointer;
+  font-size: 0.61rem;
+  font-weight: 850;
+  backdrop-filter: blur(10px);
+}
+
+.spacefarer-viewport .shadow-camera-controls button[aria-pressed="true"] {
+  color: #25122d;
+  border-color: transparent;
+  background: #c1a8ff;
+}
+
+.map-panel-label.map-panel-label-dark {
+  color: #eaf4ff;
+  background: rgb(7 11 21 / 84%);
+}
+
+.spacefarer-launch {
+  position: absolute;
+  z-index: 802;
+  top: 9px;
+  right: 9px;
+  padding: 6px 9px;
+  border: 1px solid rgb(126 231 242 / 28%);
+  border-radius: 7px;
+  color: #aeeff5;
+  background: rgb(7 11 21 / 82%);
+  font-size: 0.64rem;
+  font-weight: 800;
+  text-decoration: none;
+  backdrop-filter: blur(10px);
+}
+
+.spacefarer-launch:hover {
+  color: #fff;
+  border-color: rgb(126 231 242 / 58%);
+}
+
+.spacefarer-follow {
+  position: absolute;
+  z-index: 802;
+  top: 47px;
+  right: 9px;
+  min-height: 30px;
+  padding: 5px 9px;
+  border: 1px solid rgb(126 231 242 / 30%);
+  border-radius: 99px;
+  color: #bdf7ed;
+  background: rgb(7 11 21 / 82%);
+  cursor: pointer;
+  font-size: 0.6rem;
+  font-weight: 850;
+  backdrop-filter: blur(10px);
+}
+
+.spacefarer-follow[aria-pressed="false"] {
+  color: #ffe2a0;
+  border-color: rgb(255 226 160 / 42%);
+}
+
+.spacefarer-follow:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.spacefarer-status {
+  position: absolute;
+  z-index: 801;
+  bottom: 9px;
+  left: 9px;
+  width: min(390px, calc(100% - 40px));
+  margin: 0;
+  padding: 7px 9px;
+  border-radius: 7px;
+  color: #d7ddeb;
+  background: rgb(7 10 17 / 68%);
+  pointer-events: none;
+  font-size: 0.6rem;
+  line-height: 1.35;
+}
+
 .ground-viewport {
   background: #111624;
 }

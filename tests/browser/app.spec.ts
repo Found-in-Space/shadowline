@@ -17,12 +17,18 @@ test("lays out the projections for wide and narrow browser viewports", async ({
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto("/browse/?eclipse=solar-2026-08-12-total");
 
-  const wide = await page.evaluate(() =>
-    ["mercator", "globe", "world", "ground"].map((projection) => {
-      const panel = document.querySelector(`.${projection}-panel`);
+  const selectors = [
+    ".mercator-panel",
+    ".spacefarer-map-panel",
+    ".world-panel",
+    ".ground-panel",
+  ];
+  const wide = await page.evaluate((panelSelectors) =>
+    panelSelectors.map((selector) => {
+      const panel = document.querySelector(selector);
       const map = panel?.querySelector(".map-viewport");
       if (!panel || !map) {
-        throw new Error(`The ${projection} projection has no viewport.`);
+        throw new Error(`The ${selector} projection has no viewport.`);
       }
       const panelBox = panel.getBoundingClientRect();
       const mapBox = map.getBoundingClientRect();
@@ -40,7 +46,7 @@ test("lays out the projections for wide and narrow browser viewports", async ({
           left: mapBox.left,
         },
       };
-    }),
+    }), selectors,
   );
 
   for (const { panel, map } of wide) {
@@ -54,7 +60,7 @@ test("lays out the projections for wide and narrow browser viewports", async ({
 
   await page.setViewportSize({ width: 640, height: 900 });
   const narrow = await Promise.all(
-    [".mercator-panel", ".globe-panel", ".world-panel"].map((selector) =>
+    selectors.slice(0, 3).map((selector) =>
       page.locator(selector).boundingBox(),
     ),
   );
@@ -63,12 +69,10 @@ test("lays out the projections for wide and narrow browser viewports", async ({
   expect(narrow[2]!.y).toBeGreaterThan(narrow[1]!.y + narrow[1]!.height - 2);
 });
 
-test("turns clicks in every projection into a shareable observer", async ({
-  page,
-}) => {
+test("turns clicks in either map into a shareable observer", async ({ page }) => {
   await page.goto("/browse/?eclipse=solar-2026-08-12-total");
 
-  for (const id of ["mercator-map", "globe-map", "world-map"]) {
+  for (const id of ["mercator-map", "world-map"]) {
     await page.evaluate(() => {
       const url = new URL(location.href);
       url.searchParams.delete("lat");
