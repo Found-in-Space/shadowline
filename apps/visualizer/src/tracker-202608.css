@@ -86,15 +86,16 @@ button { touch-action: manipulation; }
 }
 
 .brand-mark {
-  width: 30px;
-  height: 30px;
-  border: 1px solid rgb(255 255 255 / 24%);
-  border-radius: 50%;
-  background:
-    radial-gradient(circle at 63% 38%, #101522 0 27%, transparent 29%),
-    radial-gradient(circle at 50% 50%, var(--gold) 0 49%, #b76f35 53%, transparent 55%);
-  box-shadow: 0 0 18px rgb(255 196 93 / 25%);
+  width: 40px;
+  height: 40px;
+  flex: 0 0 auto;
+  object-fit: contain;
+  filter: drop-shadow(0 4px 8px rgb(0 0 0 / 35%)) drop-shadow(0 0 10px rgb(99 214 200 / 16%));
+  transform: rotate(-4deg);
+  transition: transform 180ms ease;
 }
+
+.brand:hover .brand-mark { transform: translateY(-2px) rotate(3deg); }
 
 .brand > span:last-child { display: grid; }
 .brand small { color: var(--violet); font-size: 0.58rem; font-weight: 850; letter-spacing: 0.13em; text-transform: uppercase; }
@@ -478,4 +479,5 @@ noscript { display: block; padding: 20px; color: var(--danger); text-align: cent
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; }
+  .brand-mark { transition: none; }
 }
