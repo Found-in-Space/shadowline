@@ -46,6 +46,13 @@ interface DecodedElevation {
   pixels: Uint8ClampedArray;
 }
 
+const SEA_LEVEL_ELEVATION: DecodedElevation = {
+  width: 1,
+  height: 1,
+  // Terrarium encodes metres as R * 256 + G + B / 256 - 32768.
+  pixels: new Uint8ClampedArray([128, 0, 0, 255]),
+};
+
 interface ElevationResource {
   elevation: DecodedElevation;
   sourceScale: number;
@@ -110,11 +117,19 @@ async function fetchBitmap(url: string, signal: AbortSignal): Promise<ImageBitma
   return createImageBitmap(await response.blob());
 }
 
-async function loadElevation(
+export async function loadElevation(
   tile: Pick<GroundTerrainTile, "z" | "x" | "y">,
   signal: AbortSignal,
 ): Promise<DecodedElevation> {
-  const bitmap = await fetchBitmap(tileUrl(ELEVATION_URL_TEMPLATE, tile), signal);
+  const response = await fetch(tileUrl(ELEVATION_URL_TEMPLATE, tile), {
+    cache: "force-cache",
+    signal,
+  });
+  // Mapterhorn intentionally has no tiles for open water. Treat those gaps as
+  // sea level so a coastal view can still render its available land terrain.
+  if (response.status === 404) return SEA_LEVEL_ELEVATION;
+  if (!response.ok) throw new Error(`Tile provider returned ${response.status}.`);
+  const bitmap = await createImageBitmap(await response.blob());
   try {
     const canvas = document.createElement("canvas");
     canvas.width = bitmap.width || ELEVATION_TILE_SIZE;
