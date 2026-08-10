@@ -656,8 +656,8 @@ function showComparisonInstant(
   spacefarer?.setTime(peakMs, event);
   const utcClock = new Date(peakMs).toISOString().slice(11, 19);
   spacefarerMomentLabel = local
-    ? `All four views · ${utcClock} UTC`
-    : `All four views · global peak · ${utcClock} UTC`;
+    ? `Local maximum · ${utcClock} UTC`
+    : `Global peak · ${utcClock} UTC`;
   spacefarerStatus.textContent =
     `${spacefarerMomentLabel} · ${spacefarerStatusMessage}`;
   for (const container of [

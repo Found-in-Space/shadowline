@@ -15,6 +15,7 @@ npm-debug.log*
 *.tgz
 .env
 .env.*
+.envrc
 !.env.example
 *.tsbuildinfo
 .DS_Store

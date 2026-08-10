@@ -1,42 +1,47 @@
-# @found-in-space/shadowline-astronomy-engine
+# `@found-in-space/shadowline-astronomy-engine`
 
-Status: current 0.2 provider package.
+Astronomy Engine integration for
+[`@found-in-space/shadowline`](https://www.npmjs.com/package/@found-in-space/shadowline).
+It finds eclipses, supplies Sun and Moon positions, and calculates local
+eclipse times.
 
-Astronomy Engine 2.1.19 capabilities for
-`@found-in-space/shadowline`.
-
-This adapter supplies Earth-fixed Sun and Moon ephemerides, eclipse search, and
-observer circumstances through Shadowline's public capability interfaces.
+> [!WARNING]
+> **Very early alpha.** APIs and results are likely to change. Use this release
+> for learning and experimentation, not yet as a stable production dependency.
 
 ## Install
 
 ```bash
-npm install @found-in-space/shadowline \
-  @found-in-space/shadowline-astronomy-engine
+npm install @found-in-space/shadowline@alpha @found-in-space/shadowline-astronomy-engine@alpha
 ```
 
-## Use
+## Example
 
-```ts
+```js
 import { EclipseEngine } from "@found-in-space/shadowline";
-import {
-  astronomyEngineCapabilities,
-} from "@found-in-space/shadowline-astronomy-engine";
+import { astronomyEngineCapabilities } from "@found-in-space/shadowline-astronomy-engine";
 
 const engine = new EclipseEngine(astronomyEngineCapabilities());
 const events = engine.events({
   startUtc: "2026-01-01T00:00:00Z",
   endUtc: "2027-01-01T00:00:00Z",
 });
+
+for (const event of events) {
+  console.log(`${event.peakUtc}: ${event.kind} solar eclipse`);
+}
 ```
 
-Use `AstronomyEngineProvider` directly when an application needs the individual
-interfaces or frame-labelled state vectors:
+For most applications, `astronomyEngineCapabilities()` is the only export from
+this package that you need. It gives `EclipseEngine` eclipse search, Sun and
+Moon positions, and local circumstances.
 
-```ts
-import {
-  AstronomyEngineProvider,
-} from "@found-in-space/shadowline-astronomy-engine";
+## Direct provider access
+
+Advanced applications can use `AstronomyEngineProvider` directly:
+
+```js
+import { AstronomyEngineProvider } from "@found-in-space/shadowline-astronomy-engine";
 
 const provider = new AstronomyEngineProvider();
 const sun = provider.stateVector(
@@ -44,23 +49,13 @@ const sun = provider.stateVector(
   "2026-08-12T17:46:00Z",
   "geocentric-earth-fixed",
 );
+
+console.log(sun.positionAu);
 ```
 
-## Capabilities
+The main Shadowline package remains responsible for shadow paths, visibility
+areas, GeoJSON, and KML.
 
-`astronomyEngineCapabilities()` returns one provider split into the three
-capability lanes accepted by `EclipseEngine`:
+## Licence
 
-- `EarthFixedEphemeris`
-- `EclipseSearch`
-- `ObserverCircumstances`
-
-The provider also exposes frame-labelled geocentric, heliocentric, and
-barycentric state vectors for consumers that need them directly.
-
-## Boundary
-
-This is the only workspace package that depends on Astronomy Engine. It
-normalizes provider output but does not calculate shadow cones, surface paths,
-penumbral topology, GeoJSON, KML, or renderer state. Those remain in
-`@found-in-space/shadowline` or downstream applications.
+MIT

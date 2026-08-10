@@ -1,0 +1,52 @@
+:root {
+  --made-by-kaj-offset: calc(2.4rem + env(safe-area-inset-bottom));
+}
+
+body {
+  padding-bottom: var(--made-by-kaj-offset);
+}
+
+.made-by-kaj {
+  position: fixed;
+  z-index: 4000;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--made-by-kaj-offset);
+  padding: 0.45rem max(0.75rem, env(safe-area-inset-right))
+    calc(0.45rem + env(safe-area-inset-bottom))
+    max(0.75rem, env(safe-area-inset-left));
+  color: #aab3c7;
+  background: rgb(0 0 0 / 94%);
+  font-family: var(
+    --ui,
+    Inter,
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif
+  );
+  font-size: 0.85rem;
+  letter-spacing: 0.01em;
+  line-height: 1.5;
+  text-align: center;
+}
+
+.made-by-kaj a {
+  color: #6495ed;
+  text-decoration: none;
+}
+
+.made-by-kaj a:hover {
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+.made-by-kaj__heart {
+  font-size: 1em;
+}

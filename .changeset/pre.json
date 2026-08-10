@@ -1,0 +1,12 @@
+{
+  "mode": "pre",
+  "tag": "alpha",
+  "initialVersions": {
+    "@found-in-space/shadowline-visualizer": "0.1.0-alpha.0",
+    "@found-in-space/shadowline": "0.0.0",
+    "@found-in-space/shadowline-astronomy-engine": "0.0.0"
+  },
+  "changesets": [
+    "full-eclipse-contacts"
+  ]
+}

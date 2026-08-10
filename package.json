@@ -1,6 +1,6 @@
 {
   "name": "@found-in-space/shadowline-workspace",
-  "version": "0.2.0",
+  "version": "0.1.0-alpha.0",
   "private": true,
   "description": "Renderer-independent eclipse geometry and map examples for Found in Space",
   "type": "module",
@@ -8,7 +8,7 @@
   "homepage": "https://github.com/Found-in-Space/shadowline#readme",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Found-in-Space/shadowline"
+    "url": "git+https://github.com/Found-in-Space/shadowline.git"
   },
   "bugs": {
     "url": "https://github.com/Found-in-Space/shadowline/issues"
