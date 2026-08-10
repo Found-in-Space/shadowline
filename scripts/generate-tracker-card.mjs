@@ -34,7 +34,7 @@ const DEFAULT_BLUE_MARBLE = path.join(
 );
 const DEFAULT_ROBOT = path.join(
   REPOSITORY_ROOT,
-  "apps/visualizer/public/tracker/202608/icon-512.png",
+  "apps/visualizer/public/tracker/assets/icon-512.png",
 );
 const DEFAULT_WIDTH = 1200;
 const DEFAULT_HEIGHT = 630;
@@ -416,7 +416,13 @@ async function runImageEdit({
       fit: "contain",
       background: "#020713",
     })
-    .png({ compressionLevel: 9 })
+    .png({
+      compressionLevel: 9,
+      palette: true,
+      quality: 90,
+      effort: 10,
+      dither: 1,
+    })
     .toFile(finalOutputPath);
 }
 
