@@ -298,7 +298,7 @@ export class TrackerGroundView {
     this.camera = camera;
     this.updateBearing(camera);
     this.draw();
-    this.status("");
+    this.status("Loading ground view… 0%");
     try {
       const snapshot = await renderGroundTerrainSnapshot({
         observer: location.observer,
@@ -306,6 +306,11 @@ export class TrackerGroundView {
         width: size.width,
         height: size.height,
         signal: controller.signal,
+        onProgress: (loaded, total) => {
+          if (version !== this.buildVersion || controller.signal.aborted) return;
+          const percentage = Math.round(loaded / total * 100);
+          this.status(`Loading ground view… ${percentage}%`);
+        },
       });
       if (version !== this.buildVersion || controller.signal.aborted) {
         snapshot.bitmap.close();
