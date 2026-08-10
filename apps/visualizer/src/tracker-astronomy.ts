@@ -28,6 +28,14 @@ export function configureOperationalDeltaT202608(): void {
   SetDeltaTFunction(() => TRACKER_DELTA_T_SECONDS);
 }
 
+export function configureTrackerDeltaT(eventId: string): void {
+  if (eventId === "solar-2026-08-12-total") {
+    configureOperationalDeltaT202608();
+  } else {
+    configureGeneralDeltaT();
+  }
+}
+
 export function configureGeneralDeltaT(): void {
   SetDeltaTFunction(DeltaT_EspenakMeeus);
 }

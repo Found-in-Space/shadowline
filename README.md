@@ -155,6 +155,52 @@ just setup
 just validate
 ```
 
+### Tracker artwork pipeline
+
+Tracker artwork starts with a deterministic, headless PNG rather than a
+browser screenshot. For total and annular eclipses, the script renders the
+complete central-path boundary and centreline. For partial eclipses, it renders
+the penumbral shadow at global peak. It finds the smallest antimeridian-safe
+crop with padding and draws that geometry over the bundled Blue Marble.
+
+The pipeline intersects the rendered shadow with a pinned offline
+country-boundary dataset, then gives OpenAI's image editor exactly three
+creative elements: the authoritative shadow PNG, one transparent Robot PNG,
+and the country/territory list. The date and eclipse type are supplied as
+facts. The shadow PNG is a locked scientific base plate: projection,
+coastlines, islands, crop, and eclipse geometry must remain unchanged. The
+model may add one restrained visual joke without obscuring or reinterpreting
+that geography.
+
+All dated tracker routes use one shared page template, stylesheet and runtime.
+The three total-eclipse trackers for 2026–2028 are defined only by the event
+records in `apps/visualizer/tracker/events.json`; their dated HTML pages and web
+app manifests are generated automatically before development and production
+builds.
+
+Generate and inspect only the reproducible scientific inputs:
+
+```bash
+npm run generate:tracker-card -- \
+  --event solar-2026-08-12-total \
+  --base-only
+```
+
+Run the complete pipeline after setting `OPENAI_API_KEY`:
+
+```bash
+OPENAI_API_KEY=... npm run generate:tracker-card -- \
+  --event solar-2026-08-12-total
+```
+
+Use `--robot <path-to-png>` to override the single Robot reference. The model
+may still place one or several instances of The Robot in its imagined scene.
+
+Outputs are written beneath `dist/tracker-cards/<event-id>/`: the authoritative
+`shadow-base.png`, the normalized Robot reference, exact `prompt.txt`, a
+hash-bearing `manifest.json`, and (for a complete run) `card.png`. Run with
+`--help` to override the source PNGs, output directory, model, or quality.
+
 ## Visualisation testbed
 
 The explorer deliberately presents four complementary views of the same

@@ -7,7 +7,11 @@ describe("Sites static worker routing", () => {
     ["/deployment/prefix/browse", "/deployment/prefix/browse/"],
     ["/spacefarer", "/spacefarer/"],
     ["/tracker/202608", "/tracker/202608/"],
+    ["/tracker/202708", "/tracker/202708/"],
+    ["/tracker/202807", "/tracker/202807/"],
     ["/deployment/prefix/tracker/202608", "/deployment/prefix/tracker/202608/"],
+    ["/deployment/prefix/tracker/202708", "/deployment/prefix/tracker/202708/"],
+    ["/deployment/prefix/tracker/202807", "/deployment/prefix/tracker/202807/"],
   ])("preserves prefixes when redirecting %s", async (path, expected) => {
     const response = await worker.fetch(
       new Request(`https://example.test${path}?keep=yes`),

@@ -20,3 +20,5 @@ npm-debug.log*
 *.tsbuildinfo
 .DS_Store
 Thumbs.db
+apps/visualizer/tracker/[0-9][0-9][0-9][0-9][0-9][0-9]/index.html
+apps/visualizer/public/tracker/[0-9][0-9][0-9][0-9][0-9][0-9]/manifest.webmanifest

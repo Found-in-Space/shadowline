@@ -5,7 +5,9 @@
   "description": "Shadowline projection and renderer testbed",
   "type": "module",
   "scripts": {
+    "prebuild": "node ../../scripts/generate-tracker-pages.mjs",
     "build": "vite build && node ../../scripts/prepare-sites-build.mjs",
+    "predev": "node ../../scripts/generate-tracker-pages.mjs",
     "dev": "vite --host 127.0.0.1",
     "preview": "vite preview --host 127.0.0.1",
     "typecheck": "tsc --project tsconfig.json --pretty false"

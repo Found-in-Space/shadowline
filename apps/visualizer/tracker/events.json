@@ -1,0 +1,26 @@
+[
+  {
+    "slug": "202608",
+    "eventId": "solar-2026-08-12-total",
+    "kind": "total",
+    "dateLabel": "12 August 2026",
+    "weekday": "Wednesday",
+    "peakUtc": "2026-08-12T17:45:46.794Z"
+  },
+  {
+    "slug": "202708",
+    "eventId": "solar-2027-08-02-total",
+    "kind": "total",
+    "dateLabel": "2 August 2027",
+    "weekday": "Monday",
+    "peakUtc": "2027-08-02T10:06:34.636Z"
+  },
+  {
+    "slug": "202807",
+    "eventId": "solar-2028-07-22-total",
+    "kind": "total",
+    "dateLabel": "22 July 2028",
+    "weekday": "Saturday",
+    "peakUtc": "2028-07-22T02:55:24.627Z"
+  }
+]

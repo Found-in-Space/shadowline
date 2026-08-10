@@ -1,5 +1,7 @@
-const CACHE_NAME = "shadowline-tracker-202608-v11";
-const APP_ROOT = new URL("./", self.location.href);
+const APP_ROOT = new URL(self.registration.scope);
+const TRACKER_SLUG = APP_ROOT.pathname.split("/").filter(Boolean).at(-1) || "tracker";
+const CACHE_PREFIX = `shadowline-tracker-${TRACKER_SLUG}-`;
+const CACHE_NAME = `${CACHE_PREFIX}v12`;
 
 async function appShellUrls() {
   const response = await fetch(APP_ROOT, { cache: "reload" });
@@ -36,7 +38,7 @@ self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches
       .keys()
-      .then((keys) => Promise.all(keys.filter((key) => key.startsWith("shadowline-tracker-202608-") && key !== CACHE_NAME).map((key) => caches.delete(key))))
+      .then((keys) => Promise.all(keys.filter((key) => key.startsWith(CACHE_PREFIX) && key !== CACHE_NAME).map((key) => caches.delete(key))))
       .then(() => self.clients.claim()),
   );
 });

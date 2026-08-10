@@ -1,5 +1,20 @@
 import { defineConfig } from "vite";
 import { resolve } from "node:path";
+import { readFileSync } from "node:fs";
+
+interface TrackerEventConfiguration {
+  slug: string;
+}
+
+const trackerEvents = JSON.parse(
+  readFileSync(new URL("./tracker/events.json", import.meta.url), "utf8"),
+) as TrackerEventConfiguration[];
+const trackerInputs = Object.fromEntries(
+  trackerEvents.map((event) => [
+    `tracker${event.slug}`,
+    resolve(import.meta.dirname, `tracker/${event.slug}/index.html`),
+  ]),
+);
 
 export default defineConfig({
   base: "./",
@@ -15,10 +30,7 @@ export default defineConfig({
           import.meta.dirname,
           "spacefarer/index.html",
         ),
-        tracker202608: resolve(
-          import.meta.dirname,
-          "tracker/202608/index.html",
-        ),
+        ...trackerInputs,
       },
     },
   },
