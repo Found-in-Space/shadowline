@@ -1,45 +1,158 @@
-# Found in Space — Shadowline
+# Shadowline
 
-Part of [Found in Space](https://foundin.space/), a project that turns real
-astronomical measurements into interactive explorations. See all repositories
-at [github.com/Found-in-Space](https://github.com/Found-in-Space).
+Explore solar eclipses, see how the calculations work, and build something of
+your own.
+
+Shadowline is part of [Found in Space](https://foundin.space/), an open
+educational project that turns astronomical data and models into things people
+can explore, question, and build with. You can use Shadowline to find eclipses,
+calculate where the Moon's shadow crosses Earth, check what happens at a chosen
+place, and export the result for a map.
+
+## Start with the eclipse tracker
+
+You do not need to install anything to explore the 12 August 2026 total solar
+eclipse. Open the
+[interactive eclipse tracker](https://foundin.space/shadowline/tracker/202608/)
+in a modern browser. You can move around the map, choose a location, and compare
+the view from Earth, space, and the ground.
+
+All of the tracker code and calculations are open in this repository. The
+examples below use the same public libraries.
 
 > [!WARNING]
-> **Shadowline is a very early alpha.** The public packages are available as
-> `0.1.0-alpha.0` under npm's `alpha` dist-tag. Package boundaries, APIs, data
-> structures, serialized output, and numerical behaviour are all likely to
-> change, potentially without a migration path. Use this release for evaluation
-> and experimentation, not as a stable production dependency.
+> **Shadowline is a very early alpha.** The examples work today, but names,
+> which package contains each feature, results, and saved-file formats may
+> change as the project develops. It is ready for learning, experimenting, and
+> testing—not yet as a dependency that you can expect to remain unchanged.
 
-Shadowline is a renderer-independent solar-eclipse toolkit with a browser-native
-planning application. It calculates complete central tracks, reports
-circumstances for an observer, and exports portable GeoJSON or KML. The
-visualizer discovers events on demand through the selected search provider.
+## Run your first example
 
-Canonical geometry is global and retains the full WGS 84 track, including
-polar coordinates. Projection-specific display changes happen only inside the
-visualizer's independent map renderers.
+You need [Node.js 22 or later](https://nodejs.org/) and a terminal. A terminal
+is the app where you type commands: Terminal on macOS or Linux, or PowerShell
+on Windows. The Node.js installer includes `npm`, the tool used below to install
+the libraries.
 
-Like the other Found in Space toolkits, Shadowline is package-first: the
-reusable geometry and ephemeris integration live in focused
-`@found-in-space/*` packages, while the visualizer is an application that
-consumes their public APIs.
-
-## Install the alpha
-
-Install the renderer-independent geometry package with the companion Astronomy
-Engine capability provider:
+Type these commands one at a time:
 
 ```bash
-npm install @found-in-space/shadowline@alpha \
-  @found-in-space/shadowline-astronomy-engine@alpha
+mkdir my-eclipse-project
+cd my-eclipse-project
+npm init -y
+npm install @found-in-space/shadowline@alpha @found-in-space/shadowline-astronomy-engine@alpha
 ```
 
-The explicit `@alpha` tag is intentional: this release is not promoted to npm's
-`latest` channel. Applications with their own Earth-fixed Sun and Moon
-ephemerides need only `@found-in-space/shadowline@alpha`.
+The `@alpha` part tells npm to install the version used by these examples.
 
-To work from the repository instead:
+Using any plain-text editor, create a file named `eclipse.mjs` inside the new
+`my-eclipse-project` folder and paste in this code:
+
+```js
+import {
+  EclipseEngine,
+  toGeoJson,
+} from "@found-in-space/shadowline";
+import {
+  astronomyEngineCapabilities,
+} from "@found-in-space/shadowline-astronomy-engine";
+
+const engine = new EclipseEngine(astronomyEngineCapabilities());
+const event = engine.events({
+  startUtc: "2026-08-01T00:00:00Z",
+  endUtc: "2026-09-01T00:00:00Z",
+})[0];
+
+if (!event) throw new Error("No eclipse found in that date range.");
+
+const scene = engine.calculateEvent(event, {
+  centralPath: true,
+  globalVisibility: true,
+  instantaneousAtUtc: [event.peakUtc],
+});
+const geoJson = toGeoJson(scene);
+
+console.log(`Found: ${event.id}`);
+console.log(`Greatest eclipse: ${event.peakUtc}`);
+console.log(`Map features created: ${geoJson.features.length}`);
+```
+
+Run it:
+
+```bash
+node eclipse.mjs
+```
+
+You should see the 12 August 2026 total eclipse and a count of the map features
+that Shadowline calculated.
+
+### What did that code do?
+
+- `EclipseEngine` is the main entry point.
+- `engine.events(...)` finds eclipses between two dates.
+- `engine.calculateEvent(...)` calculates the path and shadow.
+- `toGeoJson(...)` turns the result into a common map-data format understood by
+  tools such as Leaflet, QGIS, and Python's Folium.
+
+Most people should install both packages. `@found-in-space/shadowline` contains
+the eclipse geometry and map exporters. The companion
+`@found-in-space/shadowline-astronomy-engine` package supplies the positions of
+the Sun and Moon, eclipse search, and local eclipse times.
+
+## Ask what happens at one place
+
+The first example calculates the eclipse across the whole Earth. To ask what a
+person at one location would experience, add this to `eclipse.mjs`:
+
+```js
+const observer = {
+  latitudeDeg: 41.8167,
+  longitudeDeg: -3.185,
+};
+const local = engine.localCircumstances(event, observer);
+
+if (local) {
+  console.log(`Eclipse begins: ${local.partialBegin.utc}`);
+  console.log(`Maximum eclipse: ${local.peak.utc}`);
+  console.log(`Eclipse ends: ${local.partialEnd.utc}`);
+} else {
+  console.log("This eclipse is not visible from that location.");
+}
+```
+
+Latitude is positive north of the equator and longitude is positive east of
+Greenwich. The example location is in northern Spain. You can replace the two
+numbers with another place.
+
+## Save the result for a map
+
+The first example creates a `geoJson` object. Add this import beside the other
+imports at the top of `eclipse.mjs`:
+
+```js
+import { writeFile } from "node:fs/promises";
+```
+
+Then add this at the end of the file:
+
+```js
+await writeFile(
+  `${event.id}.geojson`,
+  JSON.stringify(geoJson, null, 2),
+);
+```
+
+Run `node eclipse.mjs` again. You can open the new `.geojson` file in QGIS,
+load it with Python or JavaScript, or use it as the data source for your own
+map.
+
+A central-and-partial Leaflet example is checked in at
+[`packages/shadowline/examples/leaflet-scenes.ts`](packages/shadowline/examples/leaflet-scenes.ts).
+It uses only the current public exports and prepares the result for a flat Web
+Mercator map without changing the original eclipse calculation.
+
+## Work with the repository
+
+If you want to change Shadowline itself rather than use it as a library:
 
 ```bash
 git clone https://github.com/Found-in-Space/shadowline.git
@@ -48,28 +161,25 @@ npm ci
 npm run build:packages
 ```
 
-## Architecture
+## How the project is organised
 
 ```text
 @found-in-space/shadowline
-  dependency-free geometry, discovery facade, and GIS exporters
+  turns Sun and Moon positions into eclipse paths and map data
             │
             ├── @found-in-space/shadowline-astronomy-engine
-            │     ephemerides, eclipse search, and observer circumstances
+            │     finds eclipses and supplies Sun and Moon positions
             │
             └── apps/visualizer
-                  Vanilla TypeScript, Vite, Leaflet, MapLibre,
-                  OpenStreetMap, and NASA GIBS
+                  powers the interactive website
 ```
 
-`@found-in-space/shadowline` owns the public model and accepts separate
-Earth-fixed ephemeris, eclipse-search, and observer-circumstances
-capabilities. Geometry requires only the ephemeris capability. Astronomy
-Engine is isolated in a separate adapter so a future foundin.space native
-provider can replace any capability without changing the geometry, exporter,
-or application APIs.
+The astronomy helper is kept separate so that a future project can use another
+source for Sun and Moon positions without replacing the path and map code. Most
+users do not need to think about this split: install both packages and pass
+`astronomyEngineCapabilities()` to `EclipseEngine`, as in the first example.
 
-## Development
+## Development for contributors
 
 Node.js 22 or later is required for package and visualizer development:
 
@@ -167,49 +277,11 @@ just validate       # complete deterministic validation
 The visualizer queries only requested years and a short window for its next
 eclipse list, then caches those results for the current browser session.
 
-## Package API
+## Reference for larger projects
 
-The TypeScript snippets in this README show the current alpha API. Their
-package-name imports resolve after installing both packages with the `@alpha`
-tag. Expect these examples and the APIs they demonstrate to change during the
-alpha period.
-
-```ts
-import {
-  EclipseEngine,
-  GeoJsonExporter,
-} from "@found-in-space/shadowline";
-import {
-  astronomyEngineCapabilities,
-} from "@found-in-space/shadowline-astronomy-engine";
-
-const engine = new EclipseEngine(astronomyEngineCapabilities());
-
-const event = engine.events({
-  startUtc: "2026-08-01T00:00:00Z",
-  endUtc: "2026-09-01T00:00:00Z",
-})[0];
-if (!event) throw new Error("No eclipse found in the requested range.");
-
-const scene = engine.calculateEvent(event, {
-  centralPath: true,
-  globalVisibility: true,
-  instantaneousAtUtc: [event.peakUtc],
-});
-const download = new GeoJsonExporter().export(scene);
-
-const observer = { latitudeDeg: 41.8167, longitudeDeg: -3.185 };
-const localMaximum = engine.localCircumstances(event, observer);
-const shadow = localMaximum
-  ? engine.calculateInstantaneousShadow(event, localMaximum.peak.utc)
-  : null;
-```
-
-A central-and-partial Leaflet example is checked in at
-[`packages/shadowline/examples/leaflet-scenes.ts`](packages/shadowline/examples/leaflet-scenes.ts);
-it is under 50 nonblank lines, uses only the current public exports, and clips
-derived display geometry at Web Mercator's latitude limit without changing the
-scene.
+The rest of this README explains the details needed when you want to build a
+larger application, renderer, or scientific comparison. You do not need to
+understand these coordinate systems to run the examples above.
 
 The public units are explicit:
 
@@ -220,9 +292,9 @@ The public units are explicit:
 - ephemeris positions are AU and velocities are AU/day;
 - every state vector names its origin and reference frame.
 
-Local searches accept an observer and a bounded range:
+To search for every eclipse visible from one location in a date range:
 
-```ts
+```js
 const local = engine.localEclipses(
   { latitudeDeg: 41.39, longitudeDeg: 2.17, elevationMeters: 20 },
   {
@@ -230,6 +302,8 @@ const local = engine.localEclipses(
     endUtc: "2100-01-01T00:00:00Z",
   },
 );
+
+console.log(`Found ${local.length} visible eclipses.`);
 ```
 
 The maximum local-search window is 200 years. For a selected map point, the SPA
@@ -355,13 +429,14 @@ See `NOTICE.md` for source acknowledgements and third-party licences.
 
 ## Releases
 
-The first public release is `0.1.0-alpha.0`. Both packages use npm's `alpha`
-dist-tag and deliberately remain outside the `latest` channel while their APIs
-are unstable.
+Shadowline is currently an alpha release. Use the `@alpha` installation command
+shown above so that your project follows the versions used by these examples.
+During the alpha period, a future release may require you to update your code.
 
 The public packages are set up to use Changesets for versioning. See
 [`docs/releasing.md`](docs/releasing.md) for validation, packed-consumer, and
-publishing steps.
+publishing details. Those details are for maintainers; you do not need them to
+use the library.
 
 ## Licence
 

@@ -1,37 +1,43 @@
-# @found-in-space/shadowline
+# `@found-in-space/shadowline`
+
+Find solar eclipses, calculate the Moon's shadow on Earth, and turn the result
+into data for a map.
+
+This is the main Shadowline library. It is part of
+[Found in Space](https://foundin.space/), an open educational project that
+helps people explore scientific views, question how they were made, and build
+with the data and code behind them.
+
+Want to explore before writing code? Open the
+[12 August 2026 eclipse tracker](https://foundin.space/shadowline/tracker/202608/).
 
 > [!WARNING]
-> **Very early alpha.** This package is available as `0.1.0-alpha.0` under npm's
-> `alpha` dist-tag. Its API, scene model, serialization schema, and numerical
-> behaviour are likely to change, potentially without a migration path. The
-> examples describe the current alpha, not a stable library.
+> **This library is a very early alpha.** These examples work with the current
+> release, but names, results, and saved-file formats may change. It is a good
+> fit for learning and experimentation, but not yet for a project that requires
+> a permanently stable API.
 
-Dependency-free, renderer-independent solar-eclipse geometry for Found in Space
-applications, browser maps, and back ends.
+## Run a first example
 
-The package turns Earth-fixed Sun and Moon state vectors into physical eclipse
-scenes. It does not depend on Astronomy Engine, Leaflet, MapLibre, Three.js, a
-DOM, or a map projection.
+You need [Node.js 22 or later](https://nodejs.org/). A terminal is the app where
+you type commands: Terminal on macOS or Linux, or PowerShell on Windows. The
+Node.js installer includes `npm`, the tool used below to install the libraries.
 
-## Install the alpha
-
-Install both the geometry package and the Astronomy Engine capability provider:
+Type these commands one at a time:
 
 ```bash
-npm install @found-in-space/shadowline@alpha \
-  @found-in-space/shadowline-astronomy-engine@alpha
+mkdir my-eclipse-project
+cd my-eclipse-project
+npm init -y
+npm install @found-in-space/shadowline@alpha @found-in-space/shadowline-astronomy-engine@alpha
 ```
 
-The Astronomy Engine adapter is optional; applications can instead pass their
-own `EarthFixedEphemeris` in an `EclipseCapabilities` object. Keep the explicit
-`@alpha` tag until a stable release is available.
+The `@alpha` part tells npm to install the version used by this documentation.
 
-## Minimal scene
+Using any plain-text editor, create a file named `eclipse.mjs` inside the new
+`my-eclipse-project` folder:
 
-This example matches the current alpha API and works after installing the two
-packages above.
-
-```ts
+```js
 import {
   EclipseEngine,
   toGeoJson,
@@ -45,92 +51,153 @@ const event = engine.events({
   startUtc: "2026-08-01T00:00:00Z",
   endUtc: "2026-09-01T00:00:00Z",
 })[0];
-if (!event) throw new Error("No eclipse found in the requested range.");
+
+if (!event) throw new Error("No eclipse found in that date range.");
 
 const scene = engine.calculateEvent(event, {
   centralPath: true,
   globalVisibility: true,
   instantaneousAtUtc: [event.peakUtc],
 });
-
 const geoJson = toGeoJson(scene);
+
+console.log(`Found: ${event.id}`);
+console.log(`Greatest eclipse: ${event.peakUtc}`);
+console.log(`Map features created: ${geoJson.features.length}`);
 ```
 
-`EclipseScene` is the hand-off between physical calculation and presentation.
-A custom Canvas, SVG, globe, GIS, or XR renderer can consume its surface
-topology directly. A flat map can serialize the same scene with its own seam
-and latitude policy.
+Run it:
 
-## Physical scene
+```bash
+node eclipse.mjs
+```
 
-The current alpha model uses Earth-fixed Cartesian WGS 84 positions:
+You should see the 12 August 2026 total solar eclipse and a count of the map
+features that were calculated.
 
-- `SurfacePoint.ecefKm` is the physical coordinate;
-- `SurfacePoint.geographic` is a derived longitude/latitude convenience;
-- `centralPath` contains the centreline and signed cross-track limits;
-- `globalVisibility` contains penumbral extent and horizon curves;
-- `instantaneousShadows` contains explicit central and penumbral regions; and
-- `contacts` contains the applicable P1–P4 tangencies.
+## What are the two packages for?
 
-Partial-only eclipses have `centralPath: null` and instantaneous shadows with
-`central: null`. Their penumbral regions remain complete and exportable.
+Most people should install both:
 
-## Granular calculations
+- `@found-in-space/shadowline` calculates paths, shadows, and map data.
+- `@found-in-space/shadowline-astronomy-engine` supplies the positions of the
+  Sun and Moon, finds eclipses, and calculates local eclipse times.
 
-`calculateEvent()` is the beginner-facing facade. Lower-level consumers can use:
+Keeping them separate means that a more advanced project can use a different
+source of astronomical positions without replacing the geometry or map code.
 
-- `calculateCentralPath()`
-- `calculateGlobalContacts()`
-- `calculateGlobalVisibility()`
-- `calculateInstantaneousShadow()`
-- `calculateTimeMarkers()`
+## Ask about a location
 
-Time markers are optional enrichment. They are not part of the physical path
-calculation.
+After the first example has found `event`, ask what happens at one place:
 
-## Serialization
+```js
+const observer = {
+  latitudeDeg: 41.8167,
+  longitudeDeg: -3.185,
+};
+const local = engine.localCircumstances(event, observer);
 
-Use `toGeoJson(scene, options)`, `GeoJsonExporter`, or `KmlExporter` at the
-serialization boundary:
+if (local) {
+  console.log(`Eclipse begins: ${local.partialBegin.utc}`);
+  console.log(`Maximum eclipse: ${local.peak.utc}`);
+  console.log(`Eclipse ends: ${local.partialEnd.utc}`);
+} else {
+  console.log("This eclipse is not visible from that location.");
+}
+```
 
-```ts
+Latitude is positive north of the equator. Longitude is positive east of
+Greenwich. `elevationMeters` can also be added when it is known.
+
+## Use the result on a map
+
+`toGeoJson(scene)` creates [GeoJSON](https://geojson.org/), a common map-data
+format. Leaflet, MapLibre, OpenLayers, QGIS, Folium, and many other tools can
+read it.
+
+Most online street maps use a flat map shape called Web Mercator. For one of
+those maps, you can ask Shadowline to split shapes at the map edge and clip the
+polar area that the map cannot show:
+
+```js
 const webMap = toGeoJson(scene, {
   seam: "split",
   latitudeClipDeg: 85.051128,
 });
 ```
 
-GeoJSON is a derived interchange view, not the scene model. Renderers must not
-reconstruct physical rings from antimeridian-split GeoJSON.
-
-## Capability boundary
-
-Construct `EclipseEngine` with an `EclipseCapabilities` object. Geometry needs
-only `ephemeris: EarthFixedEphemeris`. Global eclipse search and observer
-circumstances are optional capabilities; methods that need a missing optional
-service throw `EclipseCapabilityError`.
-
-This keeps provider selection independent of geometry, serialization, and
-rendering.
-
-## Example
-
-[`examples/leaflet-scenes.ts`](examples/leaflet-scenes.ts) renders one central
-and one partial-only eclipse in Leaflet. It stays under 50 nonblank lines and
-uses only the current public exports. Install the example's renderer separately:
+The checked-in
+[`examples/leaflet-scenes.ts`](examples/leaflet-scenes.ts) shows one central
+eclipse and one partial eclipse in Leaflet. Install Leaflet separately when you
+want to run it:
 
 ```bash
 npm install leaflet
 npm install --save-dev @types/leaflet
 ```
 
-The consuming page supplies a sized `#map` container; the example imports
-Leaflet's stylesheet and clips its derived display geometry at the Web Mercator
-latitude limit.
+The page that uses the example needs a visible, sized element with `id="map"`.
 
-## Boundary
+## Main methods
 
-This package owns eclipse geometry, physical scene topology, WGS 84 coordinate
-conversion, and portable serialization. Ephemeris models belong in provider
-packages. Map projections, tiles, styling, interaction, and renderer-specific
-clipping belong in applications or renderer adapters.
+`EclipseEngine` is the main entry point:
+
+| Method | What it answers |
+|---|---|
+| `events(range)` | Which eclipses happen between two dates? |
+| `eventsForYear(year)` | Which eclipses happen in one year? |
+| `localEclipses(observer, range)` | Which eclipses are visible from one place? |
+| `localCircumstances(event, observer)` | When does one eclipse begin, peak, and end there? |
+| `calculateEvent(event, options)` | What is the complete path, visibility area, and selected shadow? |
+| `calculateInstantaneousShadow(event, utc)` | Where is the shadow at one instant? |
+
+Advanced applications can also call `calculateCentralPath()`,
+`calculateGlobalContacts()`, `calculateGlobalVisibility()`, and
+`calculateTimeMarkers()` separately.
+
+## What is an `EclipseScene`?
+
+`calculateEvent()` returns an `EclipseScene`: one renderer-independent result
+that a Canvas, SVG, flat map, globe, GIS application, or future XR view can use.
+It can contain:
+
+- the centreline and limits of a central eclipse;
+- the wider area where a partial eclipse is visible;
+- the shadow at caller-selected times;
+- global contact points; and
+- optional time markers.
+
+The physical surface points are stored as WGS 84 Earth-fixed Cartesian
+coordinates in kilometres. Longitude and latitude are also included for
+convenience. Partial-only eclipses have no central path, but still include their
+complete partial-visibility and shadow data.
+
+## Saving data
+
+Use `toGeoJson(scene, options)`, `GeoJsonExporter`, or `KmlExporter` when data
+needs to leave the calculation library. GeoJSON and KML are derived views of
+the physical scene; the scene remains the source of truth.
+
+## Using another astronomy provider
+
+This is an advanced extension point; most users can ignore it.
+
+Construct `EclipseEngine` with an `EclipseCapabilities` object. Geometry needs
+an `EarthFixedEphemeris`, which supplies Earth-fixed Sun and Moon positions.
+Eclipse search and observer circumstances are optional capabilities. A method
+that needs a missing capability throws `EclipseCapabilityError`.
+
+This boundary keeps the astronomy model independent from geometry,
+serialization, and rendering.
+
+## Scientific boundary
+
+Shadowline calculates smooth-limb, planning-grade eclipse geometry on WGS 84.
+It does not include local terrain horizons or the mountains and valleys on the
+Moon. Read the root project's
+[accuracy and validation notes](https://github.com/Found-in-Space/shadowline#accuracy-and-validation)
+before using results where seconds or kilometres matter.
+
+## Licence
+
+MIT
