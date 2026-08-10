@@ -5,7 +5,7 @@ const worker = {
     if (
       url.pathname.endsWith("/browse") ||
       url.pathname.endsWith("/spacefarer") ||
-      url.pathname.endsWith("/tracker/202608")
+      /\/tracker\/\d{6}$/.test(url.pathname)
     ) {
       url.pathname += "/";
       return Response.redirect(url, 308);

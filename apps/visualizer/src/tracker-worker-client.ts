@@ -13,6 +13,7 @@ interface WorkerResponse<T> {
 }
 
 export class TrackerWorkerClient {
+  private readonly eventId: string;
   private readonly worker = new Worker(
     new URL("./tracker-worker.ts", import.meta.url),
     { type: "module" },
@@ -23,7 +24,8 @@ export class TrackerWorkerClient {
     { resolve(value: unknown): void; reject(reason: Error): void }
   >();
 
-  constructor() {
+  constructor(eventId: string) {
+    this.eventId = eventId;
     this.worker.addEventListener(
       "message",
       (message: MessageEvent<WorkerResponse<unknown>>) => {
@@ -51,7 +53,7 @@ export class TrackerWorkerClient {
   }
 
   initialize(): Promise<{ event: EclipseSummary; scene: EclipseScene }> {
-    return this.request({ type: "initialize" });
+    return this.request({ type: "initialize", eventId: this.eventId });
   }
 
   calculateLocation(observer: Observer): Promise<{ local: LocalEclipse | null }> {

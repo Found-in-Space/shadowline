@@ -11,11 +11,12 @@ import {
   AstronomyEngineProvider,
   astronomyEngineCapabilities,
 } from "@found-in-space/shadowline-astronomy-engine";
-import { configureOperationalDeltaT202608 } from "./tracker-astronomy.js";
+import { configureTrackerDeltaT } from "./tracker-astronomy.js";
 
 interface InitializeRequest {
   id: number;
   type: "initialize";
+  eventId: string;
 }
 
 interface LocationRequest {
@@ -32,22 +33,31 @@ interface ShadowRequest {
 
 type TrackerRequest = InitializeRequest | LocationRequest | ShadowRequest;
 
-configureOperationalDeltaT202608();
 const provider = new AstronomyEngineProvider();
 const engine = new EclipseEngine(astronomyEngineCapabilities(provider));
-const event = engine
-  .events({
-    startUtc: "2026-08-12T00:00:00Z",
-    endUtc: "2026-08-13T00:00:00Z",
-  })
-  .find((candidate) => candidate.id === "solar-2026-08-12-total");
+let event: EclipseSummary | null = null;
 
-if (!event) {
-  throw new Error("The 12 August 2026 total solar eclipse was not found.");
+function initializeEvent(eventId: string): EclipseSummary {
+  const match = /^solar-(\d{4})-\d{2}-\d{2}-(total|annular|partial|hybrid)$/.exec(
+    eventId,
+  );
+  if (!match) throw new Error(`Invalid eclipse event ID: ${eventId}`);
+  configureTrackerDeltaT(eventId);
+  const candidate = engine
+    .eventsForYear(Number(match[1]))
+    .find((value) => value.id === eventId);
+  if (!candidate) throw new Error(`Eclipse event not found: ${eventId}`);
+  event = candidate;
+  return candidate;
+}
+
+function currentEvent(): EclipseSummary {
+  if (!event) throw new Error("The tracker worker has not been initialized.");
+  return event;
 }
 
 function overview(): EclipseScene {
-  return engine.calculateEvent(event!, {
+  return engine.calculateEvent(currentEvent(), {
     centralPath: true,
     globalVisibility: true,
     timeMarkers: true,
@@ -55,11 +65,11 @@ function overview(): EclipseScene {
 }
 
 function localCircumstances(observer: Observer): LocalEclipse | null {
-  return engine.localCircumstances(event!, observer);
+  return engine.localCircumstances(currentEvent(), observer);
 }
 
 function instantaneousShadow(atUtc: string): EclipseScene {
-  return engine.calculateEvent(event!, {
+  return engine.calculateEvent(currentEvent(), {
     centralPath: false,
     globalVisibility: false,
     instantaneousAtUtc: [atUtc],
@@ -75,7 +85,8 @@ self.addEventListener("message", (message: MessageEvent<TrackerRequest>) => {
       | { local: LocalEclipse | null }
       | { scene: EclipseScene };
     if (request.type === "initialize") {
-      result = { event: event!, scene: overview() };
+      const initializedEvent = initializeEvent(request.eventId);
+      result = { event: initializedEvent, scene: overview() };
     } else if (request.type === "location") {
       result = { local: localCircumstances(request.observer) };
     } else {

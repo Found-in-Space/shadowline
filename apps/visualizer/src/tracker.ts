@@ -1,4 +1,4 @@
-import "./tracker-202608.css";
+import "./tracker.css";
 
 import type {
   EclipseContact,
@@ -14,7 +14,7 @@ import { parseCoordinatePair } from "./location-input.js";
 import type { TrackerGroundView } from "./tracker-ground-view.js";
 import type { TrackerShadowView } from "./tracker-shadow-view.js";
 import {
-  configureOperationalDeltaT202608,
+  configureTrackerDeltaT,
   solarDiscGeometry,
   solarHorizonGeometry,
 } from "./tracker-astronomy.js";
@@ -24,15 +24,44 @@ import { TrackerWorkerClient } from "./tracker-worker-client.js";
 
 const CLOCK_URL = "https://data.foundin.space/api/v1/time";
 const LOCATION_URL = "https://data.foundin.space/api/v1/location";
-const LOCATION_STORAGE_KEY = "shadowline-tracker-202608-location";
-const ELEVATION_SOURCE_STORAGE_KEY =
-  "shadowline-tracker-202608-elevation-source";
-const CLOCK_STORAGE_KEY = "shadowline-tracker-202608-clock";
+interface TrackerConfiguration {
+  slug: string;
+  eventId: string;
+  kind: "total" | "annular" | "partial" | "hybrid";
+  dateLabel: string;
+  weekday: string;
+  peakUtc: string;
+}
+
+function trackerConfiguration(): TrackerConfiguration {
+  const node = document.getElementById("tracker-config");
+  if (!(node instanceof HTMLScriptElement)) {
+    throw new Error("Missing tracker configuration.");
+  }
+  const configuration = JSON.parse(node.textContent ?? "null") as TrackerConfiguration;
+  if (
+    !configuration ||
+    !/^\d{6}$/.test(configuration.slug) ||
+    !/^solar-\d{4}-\d{2}-\d{2}-(total|annular|partial|hybrid)$/.test(
+      configuration.eventId,
+    ) ||
+    !Number.isFinite(Date.parse(configuration.peakUtc))
+  ) {
+    throw new Error("Invalid tracker configuration.");
+  }
+  return configuration;
+}
+
+const TRACKER = trackerConfiguration();
+const STORAGE_NAMESPACE = `shadowline-tracker-${TRACKER.slug}`;
+const LOCATION_STORAGE_KEY = `${STORAGE_NAMESPACE}-location`;
+const ELEVATION_SOURCE_STORAGE_KEY = `${STORAGE_NAMESPACE}-elevation-source`;
+const CLOCK_STORAGE_KEY = `${STORAGE_NAMESPACE}-clock`;
 const CLOCK_CACHE_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 const CLOCK_RESYNC_INTERVAL_MS = 5 * 60 * 1000;
-const FALLBACK_RANGE_START = Date.parse("2026-08-12T15:20:00Z");
-const FALLBACK_RANGE_END = Date.parse("2026-08-12T20:10:00Z");
-const DEFAULT_PREVIEW = Date.parse("2026-08-12T17:46:00Z");
+const DEFAULT_PREVIEW = Date.parse(TRACKER.peakUtc);
+const FALLBACK_RANGE_START = DEFAULT_PREVIEW - 4 * 60 * 60 * 1000;
+const FALLBACK_RANGE_END = DEFAULT_PREVIEW + 4 * 60 * 60 * 1000;
 
 interface NamedContact {
   key: "C1" | "C2" | "MAX" | "C3" | "C4" | "P1" | "P4";
@@ -103,8 +132,8 @@ const overviewPanes: Record<OverviewView, HTMLElement> = {
   ground: element("tracker-ground"),
 };
 
-configureOperationalDeltaT202608();
-const worker = new TrackerWorkerClient();
+configureTrackerDeltaT(TRACKER.eventId);
+const worker = new TrackerWorkerClient(TRACKER.eventId);
 const globe = new MapLibreGlobeRenderer(element("tracker-globe"));
 globe.setLayerVisibility({
   centralPath: false,
@@ -1023,7 +1052,7 @@ async function prepareOffline(): Promise<void> {
     return;
   }
   try {
-    const serviceWorkerUrl = new URL("./service-worker.js", location.href);
+    const serviceWorkerUrl = new URL("../service-worker.js", location.href);
     const registration = await navigator.serviceWorker.register(serviceWorkerUrl, {
       scope: "./",
       updateViaCache: "none",

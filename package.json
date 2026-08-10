@@ -23,6 +23,7 @@
     "check": "npm run typecheck",
     "changeset": "changeset",
     "dev": "npm run dev --workspace @found-in-space/shadowline-visualizer",
+    "generate:tracker-card": "npm run build:packages && node ./scripts/generate-tracker-card.mjs",
     "release:publish": "changeset publish",
     "release:check-packed-consumers": "node ./scripts/check-packed-consumers.mjs",
     "release:lockfile": "npm install --package-lock-only --ignore-scripts --no-audit --fund=false",
@@ -40,8 +41,12 @@
     "@changesets/cli": "2.29.7",
     "@playwright/test": "1.55.1",
     "@types/node": "22.18.6",
+    "openai": "7.4.0",
+    "sharp": "0.35.3",
+    "topojson-client": "3.1.0",
     "typescript": "5.9.2",
     "vite": "7.3.6",
-    "vitest": "3.2.7"
+    "vitest": "3.2.7",
+    "world-atlas": "2.0.2"
   }
 }

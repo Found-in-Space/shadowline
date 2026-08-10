@@ -250,7 +250,10 @@ h2 { margin: 0; font-size: 1.15rem; letter-spacing: -0.025em; }
   background: var(--panel-raised);
 }
 
-.countdown-card { padding: 17px 15px; }
+.countdown-card {
+  container-type: inline-size;
+  padding: 17px 15px;
+}
 .next-event-label { display: block; min-height: 1.2em; font-size: 1rem; }
 .countdown {
   margin: 10px 0 6px;
@@ -262,6 +265,10 @@ h2 { margin: 0; font-size: 1.15rem; letter-spacing: -0.025em; }
   letter-spacing: -0.07em;
   line-height: 1;
   white-space: nowrap;
+}
+
+@supports (font-size: 1cqw) {
+  .countdown { font-size: clamp(1.8rem, 10cqw, 3.9rem); }
 }
 
 .supporting-copy { margin: 0; color: var(--muted); font-size: 0.7rem; line-height: 1.45; }

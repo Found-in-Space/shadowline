@@ -8,34 +8,34 @@
     >
     <meta
       name="description"
-      content="Follow the Moon’s shadow and see what the 12 August 2026 eclipse will look like where you are, even with a poor connection."
+      content="{{DESCRIPTION}}"
     >
     <meta property="og:type" content="website">
-    <meta property="og:title" content="12 August 2026 Eclipse Tracker — Found in Space">
+    <meta property="og:title" content="{{TITLE}}">
     <meta property="og:description" content="Follow the Moon’s shadow, see your eclipse times and preview what the Sun will look like where you are.">
     <meta property="og:image" content="./og.png">
     <meta property="og:image:width" content="1200">
     <meta property="og:image:height" content="630">
-    <meta property="og:image:alt" content="Shadowline eclipse tracker with Robbie guiding the eclipse path across Earth">
+    <meta property="og:image:alt" content="{{IMAGE_ALT}}">
     <meta name="twitter:card" content="summary_large_image">
-    <meta name="twitter:title" content="12 August 2026 Eclipse Tracker — Found in Space">
+    <meta name="twitter:title" content="{{TITLE}}">
     <meta name="twitter:description" content="Follow the Moon’s shadow and preview the eclipse from your location.">
     <meta name="twitter:image" content="./og.png">
-    <meta name="twitter:image:alt" content="Shadowline eclipse tracker with Robbie guiding the eclipse path across Earth">
+    <meta name="twitter:image:alt" content="{{IMAGE_ALT}}">
     <meta name="theme-color" content="#090d17">
-    <link rel="icon" href="./favicon.ico" sizes="32x32">
-    <link rel="icon" href="./icon.svg" type="image/svg+xml">
-    <link rel="icon" href="./favicon-32.png" type="image/png" sizes="32x32">
-    <link rel="apple-touch-icon" href="./apple-touch-icon.png">
+    <link rel="icon" href="../assets/favicon.ico" sizes="32x32">
+    <link rel="icon" href="../assets/icon.svg" type="image/svg+xml">
+    <link rel="icon" href="../assets/favicon-32.png" type="image/png" sizes="32x32">
+    <link rel="apple-touch-icon" href="../assets/apple-touch-icon.png">
     <link rel="manifest" href="./manifest.webmanifest">
-    <title>12 August 2026 Eclipse Tracker — Found in Space</title>
+    <title>{{TITLE}}</title>
   </head>
   <body>
     <a class="skip-link" href="#live-panel">Skip to eclipse times</a>
 
     <header class="tracker-header">
       <a class="brand" href="../../" aria-label="Shadowline home">
-        <img class="brand-mark" src="./icon.svg" width="40" height="40" alt="">
+        <img class="brand-mark" src="../assets/icon.svg" width="40" height="40" alt="">
         <span><small>foundin.space</small><strong>Eclipse tracker</strong></span>
       </a>
     </header>
@@ -44,8 +44,8 @@
       <section id="live-panel" class="live-panel" aria-labelledby="event-title">
         <div class="event-heading">
           <div>
-            <p class="eyebrow">Total solar eclipse · Wednesday</p>
-            <h1 id="event-title">12 August 2026</h1>
+            <p class="eyebrow">{{ECLIPSE_TYPE_LABEL}} · {{WEEKDAY}}</p>
+            <h1 id="event-title">{{DATE_LABEL}}</h1>
           </div>
           <span id="mode-badge" class="mode-badge">LIVE</span>
         </div>
@@ -98,7 +98,7 @@
           <div class="preview-heading">
             <div>
               <p id="preview-heading" class="micro-label">Preview time</p>
-              <strong id="preview-time">12 August 2026 · 17:46:00 UTC</strong>
+              <strong id="preview-time">{{DATE_LABEL}} · {{PEAK_TIME_UTC}} UTC</strong>
               <span id="preview-local-time"></span>
             </div>
             <button id="live-button" class="live-button" type="button">Return to live</button>
@@ -160,6 +160,7 @@
     <!-- 100% privacy-first analytics -->
     <script data-collect-dnt="true" async src="https://scripts.simpleanalyticscdn.com/latest.js"></script>
     <noscript><img src="https://queue.simpleanalyticscdn.com/noscript.gif?collect-dnt=true" alt="" referrerpolicy="no-referrer-when-downgrade"></noscript>
-    <script type="module" src="../../src/tracker-202608.ts"></script>
+    <script id="tracker-config" type="application/json">{{TRACKER_CONFIG_JSON}}</script>
+    <script type="module" src="../../src/tracker.ts"></script>
   </body>
 </html>
