@@ -61,10 +61,13 @@ for (const event of events) {
   const title = `${event.dateLabel} Eclipse Tracker — Found in Space`;
   const description = `Follow the Moon’s shadow and see what the ${event.dateLabel} eclipse will look like where you are, even with a poor connection.`;
   const imageAlt = `${event.dateLabel} ${typeLabel.toLowerCase()} track with The Robot`;
+  const pageUrl = `https://foundin.space/shadowline/tracker/${event.slug}/`;
   const page = replaceAll(template, {
     DESCRIPTION: description,
     TITLE: title,
     IMAGE_ALT: imageAlt,
+    PAGE_URL: pageUrl,
+    IMAGE_URL: `${pageUrl}og.png`,
     ECLIPSE_TYPE_LABEL: typeLabel,
     WEEKDAY: event.weekday,
     DATE_LABEL: event.dateLabel,
