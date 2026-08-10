@@ -1,6 +1,6 @@
 {
   "name": "@found-in-space/shadowline",
-  "version": "0.1.0-alpha.0",
+  "version": "0.1.0-alpha.1",
   "description": "Renderer-independent eclipse geometry and portable GIS exporters for Found in Space",
   "type": "module",
   "homepage": "https://github.com/Found-in-Space/shadowline/tree/main/packages/shadowline#readme",
