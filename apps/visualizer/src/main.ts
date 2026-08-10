@@ -155,9 +155,7 @@ spacefarerFollow.addEventListener("click", () => {
 const ground = new TrackerGroundView(groundContainer, {
   onStatus: (message) => {
     groundStatus.textContent = message;
-    groundStatus.hidden =
-      message.startsWith("Ground view ready") ||
-      message.startsWith("Terrain is ready");
+    groundStatus.hidden = message === "";
   },
 });
 ground.setActive(true);
