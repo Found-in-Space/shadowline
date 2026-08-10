@@ -1,5 +1,11 @@
 # @found-in-space/shadowline
 
+## 0.1.0-alpha.1
+
+### Patch Changes
+
+- 9f8d5bc: Update the package READMEs and examples for the current alpha API.
+
 ## 0.1.0-alpha.0
 
 ### Minor Changes

@@ -1,6 +1,6 @@
 {
   "name": "@found-in-space/shadowline-astronomy-engine",
-  "version": "0.1.0-alpha.0",
+  "version": "0.1.0-alpha.1",
   "description": "Astronomy Engine ephemeris provider for Found in Space Shadowline",
   "type": "module",
   "homepage": "https://github.com/Found-in-Space/shadowline/tree/main/packages/shadowline-astronomy-engine#readme",
@@ -36,7 +36,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@found-in-space/shadowline": "0.1.0-alpha.0",
+    "@found-in-space/shadowline": "0.1.0-alpha.1",
     "astronomy-engine": "2.1.19"
   },
   "license": "MIT",

@@ -13,8 +13,8 @@
     "typecheck": "tsc --project tsconfig.json --pretty false"
   },
   "dependencies": {
-    "@found-in-space/shadowline": "0.1.0-alpha.0",
-    "@found-in-space/shadowline-astronomy-engine": "0.1.0-alpha.0",
+    "@found-in-space/shadowline": "0.1.0-alpha.1",
+    "@found-in-space/shadowline-astronomy-engine": "0.1.0-alpha.1",
     "astronomy-engine": "2.1.19",
     "earcut": "3.2.3",
     "leaflet": "1.9.4",
