@@ -36,6 +36,40 @@ export interface GroundTerrainPlanOptions {
   sourceTilePixels?: number;
 }
 
+export interface GroundTerrainVisibilityOptions {
+  groundElevationMetres: number;
+  elevationAt(latitudeDeg: number, longitudeDeg: number): number | null;
+  maxTiles?: number;
+  cameraHeightMetres?: number;
+  horizonAngularStepDeg?: number;
+  horizonDistanceSamples?: number;
+  occlusionMarginDeg?: number;
+}
+
+export interface GroundTerrainRefinementPlan {
+  tiles: GroundTerrainTile[];
+  frustumCulled: number;
+  occlusionCulled: number;
+  budgetCulled: number;
+}
+
+interface GroundSurfacePoint {
+  altitudeDeg: number;
+  bearingDeg: number;
+  distanceMetres: number;
+}
+
+interface GroundHorizonBin {
+  distances: Float64Array;
+  maximumAltitudeDeg: Float64Array;
+}
+
+interface GroundHorizonModel {
+  bins: GroundHorizonBin[];
+  halfFovDeg: number;
+  bearingDeg: number;
+}
+
 function clamp(value: number, minimum: number, maximum: number): number {
   return Math.min(maximum, Math.max(minimum, value));
 }
@@ -189,6 +223,273 @@ function tileMinimumDistanceMetres(
     distanceToInterval(0, bounds.minimumEast, bounds.maximumEast),
     distanceToInterval(0, bounds.minimumNorth, bounds.maximumNorth),
   );
+}
+
+function localSurfacePoint(
+  observer: Observer,
+  latitudeDeg: number,
+  longitudeDeg: number,
+  elevationMetres: number,
+  groundElevationMetres: number,
+  cameraHeightMetres: number,
+): GroundSurfacePoint {
+  const east = radians(signedAngularDifferenceDegrees(
+    longitudeDeg,
+    observer.longitudeDeg,
+  )) * EARTH_RADIUS_METRES * Math.cos(radians(observer.latitudeDeg));
+  const north = radians(latitudeDeg - observer.latitudeDeg) * EARTH_RADIUS_METRES;
+  const distanceMetres = Math.hypot(east, north);
+  const curvatureDrop = distanceMetres * distanceMetres /
+    (2 * EARTH_RADIUS_METRES);
+  return {
+    altitudeDeg: degrees(Math.atan2(
+      elevationMetres - groundElevationMetres - cameraHeightMetres - curvatureDrop,
+      Math.max(0.01, distanceMetres),
+    )),
+    bearingDeg: normalizedDegrees(degrees(Math.atan2(east, north))),
+    distanceMetres,
+  };
+}
+
+function geographicPointAtDistance(
+  observer: Observer,
+  bearingDeg: number,
+  distanceMetres: number,
+): { latitudeDeg: number; longitudeDeg: number } {
+  const bearing = radians(bearingDeg);
+  const north = Math.cos(bearing) * distanceMetres;
+  const east = Math.sin(bearing) * distanceMetres;
+  const longitudeScale = Math.max(
+    0.01,
+    Math.cos(radians(observer.latitudeDeg)),
+  );
+  return {
+    latitudeDeg: observer.latitudeDeg + degrees(north / EARTH_RADIUS_METRES),
+    longitudeDeg: observer.longitudeDeg + degrees(
+      east / (EARTH_RADIUS_METRES * longitudeScale),
+    ),
+  };
+}
+
+function logarithmicDistances(
+  farMetres: number,
+  sampleCount: number,
+): Float64Array {
+  const count = Math.max(16, Math.min(192, Math.floor(sampleCount)));
+  const nearMetres = Math.min(80, farMetres / count);
+  const logarithmicSpan = Math.log(Math.max(1, farMetres / nearMetres));
+  return Float64Array.from({ length: count }, (_, index) =>
+    nearMetres * Math.exp(logarithmicSpan * index / (count - 1))
+  );
+}
+
+function groundHorizonModel(
+  observer: Observer,
+  camera: GroundCameraPlan,
+  options: GroundTerrainVisibilityOptions,
+): GroundHorizonModel {
+  const halfFovDeg = camera.horizontalFovDeg / 2;
+  const angularStepDeg = clamp(options.horizonAngularStepDeg ?? 0.75, 0.25, 2);
+  const binCount = Math.max(
+    2,
+    Math.ceil(camera.horizontalFovDeg / angularStepDeg) + 1,
+  );
+  const distances = logarithmicDistances(
+    camera.farMetres,
+    options.horizonDistanceSamples ?? 80,
+  );
+  const cameraHeightMetres = options.cameraHeightMetres ?? 2;
+  const bins = Array.from({ length: binCount }, (_, binIndex) => {
+    const bearingDeg = normalizedDegrees(
+      camera.bearingDeg - halfFovDeg +
+        camera.horizontalFovDeg * binIndex / (binCount - 1),
+    );
+    const maximumAltitudeDeg = new Float64Array(distances.length);
+    let maximum = -90;
+    for (let index = 0; index < distances.length; index += 1) {
+      const distanceMetres = distances[index]!;
+      const point = geographicPointAtDistance(
+        observer,
+        bearingDeg,
+        distanceMetres,
+      );
+      const elevationMetres = options.elevationAt(
+        point.latitudeDeg,
+        point.longitudeDeg,
+      );
+      if (elevationMetres !== null) {
+        maximum = Math.max(
+          maximum,
+          localSurfacePoint(
+            observer,
+            point.latitudeDeg,
+            point.longitudeDeg,
+            elevationMetres,
+            options.groundElevationMetres,
+            cameraHeightMetres,
+          ).altitudeDeg,
+        );
+      }
+      maximumAltitudeDeg[index] = maximum;
+    }
+    return { distances, maximumAltitudeDeg };
+  });
+  return { bins, halfFovDeg, bearingDeg: camera.bearingDeg };
+}
+
+function maximumBeforeDistance(
+  bin: GroundHorizonBin,
+  distanceMetres: number,
+): number | null {
+  if (distanceMetres <= bin.distances[0]!) return null;
+  let lower = 0;
+  let upper = bin.distances.length;
+  while (lower < upper) {
+    const middle = Math.floor((lower + upper) / 2);
+    if (bin.distances[middle]! < distanceMetres) lower = middle + 1;
+    else upper = middle;
+  }
+  if (lower === 0) return null;
+  const value = bin.maximumAltitudeDeg[lower - 1]!;
+  return value <= -89.999 ? null : value;
+}
+
+function horizonAltitudeDeg(
+  model: GroundHorizonModel,
+  bearingDeg: number,
+  distanceMetres: number,
+): number | null {
+  const offsetDeg = signedAngularDifferenceDegrees(
+    bearingDeg,
+    model.bearingDeg,
+  );
+  const position = (offsetDeg + model.halfFovDeg) /
+    (model.halfFovDeg * 2) * (model.bins.length - 1);
+  if (position < 0 || position > model.bins.length - 1) return null;
+  const westIndex = Math.max(0, Math.floor(position));
+  const eastIndex = Math.min(model.bins.length - 1, Math.ceil(position));
+  const west = maximumBeforeDistance(model.bins[westIndex]!, distanceMetres);
+  const east = maximumBeforeDistance(model.bins[eastIndex]!, distanceMetres);
+  if (west === null) return east;
+  if (east === null) return west;
+  return Math.max(west, east);
+}
+
+function tileVisibility(
+  tile: GroundTerrainTile,
+  observer: Observer,
+  camera: GroundCameraPlan,
+  model: GroundHorizonModel,
+  options: GroundTerrainVisibilityOptions,
+): "visible" | "frustum" | "occluded" {
+  const bounds = tileLocalBounds(tile, observer);
+  const tileSpanMetres = Math.max(
+    bounds.maximumEast - bounds.minimumEast,
+    bounds.maximumNorth - bounds.minimumNorth,
+  );
+  const minimumDistanceMetres = tileMinimumDistanceMetres(tile, observer);
+  const occluderDistanceMetres = Math.max(
+    0,
+    minimumDistanceMetres - clamp(tileSpanMetres * 0.3, 80, 2_000),
+  );
+  const cameraHeightMetres = options.cameraHeightMetres ?? 2;
+  const occlusionMarginDeg = options.occlusionMarginDeg ?? 0.45;
+  const minimumAltitudeDeg = camera.pitchDeg - camera.verticalFovDeg / 2 - 0.75;
+  const maximumAltitudeDeg = camera.pitchDeg + camera.verticalFovDeg / 2 + 0.75;
+  const fractions = [0, 0.25, 0.5, 0.75, 1];
+  let hasKnownElevation = false;
+  let intersectsFrustum = false;
+
+  for (const rowFraction of fractions) {
+    const latitudeDeg = latitudeForMercatorY(
+      tile.y + rowFraction,
+      2 ** tile.z,
+    );
+    for (const columnFraction of fractions) {
+      const longitudeDeg = tile.westDeg +
+        (tile.eastDeg - tile.westDeg) * columnFraction;
+      const elevationMetres = options.elevationAt(latitudeDeg, longitudeDeg);
+      if (elevationMetres === null) continue;
+      hasKnownElevation = true;
+      const point = localSurfacePoint(
+        observer,
+        latitudeDeg,
+        longitudeDeg,
+        elevationMetres,
+        options.groundElevationMetres,
+        cameraHeightMetres,
+      );
+      if (
+        Math.abs(signedAngularDifferenceDegrees(
+          point.bearingDeg,
+          camera.bearingDeg,
+        )) > camera.horizontalFovDeg / 2 + 0.75 ||
+        point.altitudeDeg < minimumAltitudeDeg ||
+        point.altitudeDeg > maximumAltitudeDeg
+      ) continue;
+      intersectsFrustum = true;
+      if (minimumDistanceMetres < 350) return "visible";
+      const horizon = horizonAltitudeDeg(
+        model,
+        point.bearingDeg,
+        occluderDistanceMetres,
+      );
+      if (horizon === null || point.altitudeDeg >= horizon - occlusionMarginDeg) {
+        return "visible";
+      }
+    }
+  }
+  if (!hasKnownElevation) return "visible";
+  return intersectsFrustum ? "occluded" : "frustum";
+}
+
+/**
+ * Uses the already-loaded coarse elevation surface to reject photographic
+ * refinements that are outside the vertical camera frustum or hidden below a
+ * nearer terrain horizon. Visible tiles are ordered from the observer outwards
+ * and capped so a high-DPI canvas cannot create an unbounded texture fan-out.
+ */
+export function visibleGroundTerrainTiles(
+  tiles: readonly GroundTerrainTile[],
+  observer: Observer,
+  camera: GroundCameraPlan,
+  options: GroundTerrainVisibilityOptions,
+): GroundTerrainRefinementPlan {
+  const model = groundHorizonModel(observer, camera, options);
+  const visible: GroundTerrainTile[] = [];
+  let frustumCulled = 0;
+  let occlusionCulled = 0;
+  for (const tile of tiles) {
+    const visibility = tileVisibility(tile, observer, camera, model, options);
+    if (visibility === "visible") visible.push(tile);
+    else if (visibility === "frustum") frustumCulled += 1;
+    else occlusionCulled += 1;
+  }
+  visible.sort((first, second) => {
+    const distance = tileMinimumDistanceMetres(first, observer) -
+      tileMinimumDistanceMetres(second, observer);
+    if (Math.abs(distance) > 0.1) return distance;
+    const firstBounds = tileLocalBounds(first, observer);
+    const secondBounds = tileLocalBounds(second, observer);
+    const firstBearing = degrees(Math.atan2(
+      firstBounds.minimumEast + firstBounds.maximumEast,
+      firstBounds.minimumNorth + firstBounds.maximumNorth,
+    ));
+    const secondBearing = degrees(Math.atan2(
+      secondBounds.minimumEast + secondBounds.maximumEast,
+      secondBounds.minimumNorth + secondBounds.maximumNorth,
+    ));
+    return Math.abs(signedAngularDifferenceDegrees(firstBearing, camera.bearingDeg)) -
+      Math.abs(signedAngularDifferenceDegrees(secondBearing, camera.bearingDeg));
+  });
+  const maximumTiles = Math.max(1, Math.floor(options.maxTiles ?? 96));
+  const budgetCulled = Math.max(0, visible.length - maximumTiles);
+  return {
+    tiles: visible.slice(0, maximumTiles),
+    frustumCulled,
+    occlusionCulled,
+    budgetCulled,
+  };
 }
 
 function tileIntersectsView(
