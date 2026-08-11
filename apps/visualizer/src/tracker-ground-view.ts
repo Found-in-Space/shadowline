@@ -157,6 +157,7 @@ export class TrackerGroundView {
   private buildVersion = 0;
   private active = false;
   private resizeTimer = 0;
+  private terrainSnapshotCount = 0;
 
   constructor(
     private readonly container: HTMLElement,
@@ -199,7 +200,12 @@ export class TrackerGroundView {
     this.camera = null;
     this.cancelBuild();
     this.replaceSnapshot(null);
+    this.terrainSnapshotCount = 0;
     delete this.container.dataset.terrainReady;
+    delete this.container.dataset.terrainQuality;
+    delete this.container.dataset.terrainTileCount;
+    delete this.container.dataset.terrainResourceCount;
+    delete this.container.dataset.terrainSnapshotCount;
     this.attribution.textContent = "";
     this.bearing.textContent = "";
     this.status("");
@@ -219,7 +225,12 @@ export class TrackerGroundView {
     this.location = { observer, startMs, endMs, key };
     this.cancelBuild();
     this.replaceSnapshot(null);
+    this.terrainSnapshotCount = 0;
     delete this.container.dataset.terrainReady;
+    delete this.container.dataset.terrainQuality;
+    delete this.container.dataset.terrainTileCount;
+    delete this.container.dataset.terrainResourceCount;
+    delete this.container.dataset.terrainSnapshotCount;
     this.status("");
     if (this.active) void this.rebuild();
   }
@@ -306,10 +317,33 @@ export class TrackerGroundView {
         width: size.width,
         height: size.height,
         signal: controller.signal,
-        onProgress: (loaded, total) => {
+        onProgress: (loaded, total, phase) => {
           if (version !== this.buildVersion || controller.signal.aborted) return;
-          const percentage = Math.round(loaded / total * 100);
-          this.status(`Loading ground view… ${percentage}%`);
+          const percentage = total === 0 ? 100 : Math.round(loaded / total * 100);
+          this.status(phase === "terrain"
+            ? `Loading terrain… ${percentage}%`
+            : `Refining ground detail… ${percentage}%`);
+        },
+        onSnapshot: (snapshot) => {
+          if (version !== this.buildVersion || controller.signal.aborted) {
+            snapshot.bitmap.close();
+            return;
+          }
+          this.replaceSnapshot(snapshot);
+          this.attribution.textContent = snapshot.attribution;
+          this.container.dataset.terrainReady = "true";
+          this.container.dataset.terrainQuality = snapshot.photographic
+            ? "refining"
+            : "coarse";
+          this.container.dataset.terrainTileCount = String(snapshot.tileCount);
+          this.container.dataset.terrainResourceCount = String(
+            snapshot.resourceCount,
+          );
+          this.terrainSnapshotCount += 1;
+          this.container.dataset.terrainSnapshotCount = String(
+            this.terrainSnapshotCount,
+          );
+          this.draw();
         },
       });
       if (version !== this.buildVersion || controller.signal.aborted) {
@@ -319,13 +353,29 @@ export class TrackerGroundView {
       this.replaceSnapshot(snapshot);
       this.attribution.textContent = snapshot.attribution;
       this.container.dataset.terrainReady = "true";
+      this.container.dataset.terrainQuality = snapshot.photographic
+        ? "refined"
+        : "coarse";
+      this.container.dataset.terrainTileCount = String(snapshot.tileCount);
+      this.container.dataset.terrainResourceCount = String(
+        snapshot.resourceCount,
+      );
+      this.terrainSnapshotCount += 1;
+      this.container.dataset.terrainSnapshotCount = String(
+        this.terrainSnapshotCount,
+      );
       this.status("");
       this.draw();
     } catch (error) {
       if (controller.signal.aborted || version !== this.buildVersion) return;
       console.error(error);
-      delete this.container.dataset.terrainReady;
-      this.status("Local terrain is unavailable; the sky view is still shown.");
+      if (this.snapshot) {
+        this.status("Detailed ground imagery is unavailable; coarse terrain remains.");
+      } else {
+        delete this.container.dataset.terrainReady;
+        delete this.container.dataset.terrainQuality;
+        this.status("Local terrain is unavailable; the sky view is still shown.");
+      }
       this.draw();
     } finally {
       if (version === this.buildVersion) this.controller = null;
