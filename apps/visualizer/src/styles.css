@@ -433,6 +433,84 @@ dd {
   line-height: 1.4;
 }
 
+.totality-neighbours {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.totality-prompt,
+.totality-heading {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.7rem;
+  line-height: 1.4;
+}
+
+.totality-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.totality-heading strong {
+  color: var(--ink);
+  font-size: 0.76rem;
+}
+
+.totality-heading span {
+  text-align: right;
+}
+
+.totality-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px;
+}
+
+.totality-card {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid #cdbed3;
+  border-radius: 10px;
+  color: var(--ink);
+  background: #fff;
+  cursor: pointer;
+  text-align: left;
+}
+
+.totality-card:hover {
+  border-color: #ad89ba;
+  background: var(--violet-soft);
+}
+
+.totality-card:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
+.totality-card > span {
+  color: var(--violet);
+  font-size: 0.64rem;
+  font-weight: 820;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.totality-card strong {
+  font-size: 0.74rem;
+}
+
+.totality-card small {
+  color: var(--muted);
+  font-size: 0.64rem;
+  line-height: 1.35;
+}
+
 .layer-toggles {
   display: grid;
   gap: 5px;

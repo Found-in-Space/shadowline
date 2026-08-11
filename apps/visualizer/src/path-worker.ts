@@ -11,6 +11,7 @@ import {
   AstronomyEngineProvider,
   astronomyEngineCapabilities,
 } from "@found-in-space/shadowline-astronomy-engine";
+import { totalityAboveHorizon } from "./local-eclipse-visibility.js";
 
 type PageDirection = "earlier" | "later";
 
@@ -50,6 +51,15 @@ interface SearchLocalPageRequest {
   limit: number;
 }
 
+interface SearchLocalTotalPageRequest {
+  id: number;
+  type: "search-local-total-page";
+  observer: Observer;
+  boundaryUtc: string;
+  direction: PageDirection;
+  limit: number;
+}
+
 interface SearchLocalRangeRequest {
   id: number;
   type: "search-local-range";
@@ -62,6 +72,7 @@ type WorkerRequest =
   | SearchYearRequest
   | SearchGlobalPageRequest
   | SearchLocalPageRequest
+  | SearchLocalTotalPageRequest
   | SearchLocalRangeRequest
   | CalculatePathRequest
   | CalculateLocationRequest;
@@ -172,6 +183,24 @@ self.addEventListener("message", (message: MessageEvent<WorkerRequest>) => {
         LOCAL_CHUNK_YEARS,
         (startUtc, endUtc) =>
           engine.localEclipses(request.observer, { startUtc, endUtc }),
+      );
+      self.postMessage({
+        id: request.id,
+        ok: true,
+        result: { events },
+      });
+      return;
+    }
+    if (request.type === "search-local-total-page") {
+      const events = searchPage(
+        request.boundaryUtc,
+        request.direction,
+        request.limit,
+        LOCAL_CHUNK_YEARS,
+        (startUtc, endUtc) =>
+          engine
+            .localEclipses(request.observer, { startUtc, endUtc })
+            .filter(totalityAboveHorizon),
       );
       self.postMessage({
         id: request.id,

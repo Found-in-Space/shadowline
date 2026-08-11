@@ -106,6 +106,21 @@ export class EclipseWorkerClient {
     });
   }
 
+  localTotalEventsPage(
+    observer: Observer,
+    boundaryUtc: string,
+    direction: PageDirection,
+    limit: number,
+  ): Promise<LocalEventSearchResult> {
+    return this.request({
+      type: "search-local-total-page",
+      observer,
+      boundaryUtc,
+      direction,
+      limit,
+    });
+  }
+
   localEventsInRange(
     observer: Observer,
     startUtc: string,
