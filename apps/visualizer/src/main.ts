@@ -11,6 +11,7 @@ import {
   type ProviderMetadata,
 } from "@found-in-space/shadowline";
 import { EclipseMapWorkspace } from "./map-workspace.js";
+import { visibleAboveHorizon } from "./local-eclipse-visibility.js";
 import { solarDiscGeometry } from "./tracker-astronomy.js";
 import { TrackerGroundView } from "./tracker-ground-view.js";
 import { TrackerShadowView } from "./tracker-shadow-view.js";
@@ -67,6 +68,7 @@ const yearInput = element<HTMLInputElement>("year-input");
 const placeForm = element<HTMLFormElement>("place-form");
 const aroundInput = element<HTMLInputElement>("around-input");
 const locatorPlace = element<HTMLDivElement>("locator-place");
+const totalityNeighbours = element<HTMLDivElement>("totality-neighbours");
 const timelineHeading = element<HTMLParagraphElement>("timeline-heading");
 const loadEarlierButton = element<HTMLButtonElement>("load-earlier-button");
 const loadLaterButton = element<HTMLButtonElement>("load-later-button");
@@ -103,6 +105,10 @@ let selectionVersion = 0;
 let locationVersion = 0;
 const eventsById = new Map<string, EclipseSummary>();
 const yearCache = new Map<number, Promise<EclipseSummary[]>>();
+let previousTotality: LocalEclipse | null = null;
+let nextTotality: LocalEclipse | null = null;
+let totalityLoading = false;
+let totalityError = "";
 
 function timelineState(heading: string): TimelineState {
   return {
@@ -290,6 +296,71 @@ function renderLocatorPlace(): void {
     : "<span>Selected point</span><strong>Choose a point on a map</strong>";
 }
 
+function totalityDuration(event: LocalEclipse): string {
+  if (!event.centralBegin || !event.centralEnd) return "Duration unavailable";
+  return formatDuration(
+    (Date.parse(event.centralEnd.utc) - Date.parse(event.centralBegin.utc)) /
+      1_000,
+  );
+}
+
+function totalityButton(
+  event: LocalEclipse,
+  direction: PageDirection,
+): string {
+  const relation = direction === "earlier" ? "Previous totality" : "Next totality";
+  return `<button class="totality-card" type="button" data-totality-direction="${direction}">
+    <span>${relation}</span>
+    <strong>${dateLabel(event.peak.utc, false)}</strong>
+    <small>${totalityDuration(event)} · Sun ${event.peak.sunAltitudeDeg.toFixed(0)}° high</small>
+  </button>`;
+}
+
+function renderTotalityNeighbours(): void {
+  if (!selectedObserver) {
+    totalityNeighbours.innerHTML =
+      `<p class="totality-prompt">Choose a point to find the previous and next total eclipse there.</p>`;
+    return;
+  }
+  const referenceDate = dateLabel(dayRange(aroundDate).startUtc, false);
+  if (totalityLoading) {
+    totalityNeighbours.innerHTML = `<p class="totality-heading"><strong>Totality at this point</strong><span>Relative to ${referenceDate}</span></p>
+      <p class="working">Searching across the centuries…</p>`;
+    return;
+  }
+  if (totalityError) {
+    totalityNeighbours.innerHTML = `<p class="totality-heading"><strong>Totality at this point</strong><span>Relative to ${referenceDate}</span></p>
+      <p class="error-state">${escapeHtml(totalityError)}</p>`;
+    return;
+  }
+  if (!previousTotality || !nextTotality) return;
+  totalityNeighbours.innerHTML = `<p class="totality-heading"><strong>Totality at this point</strong><span>Relative to ${referenceDate}</span></p>
+    <div class="totality-grid">
+      ${totalityButton(previousTotality, "earlier")}
+      ${totalityButton(nextTotality, "later")}
+    </div>`;
+  totalityNeighbours
+    .querySelectorAll<HTMLButtonElement>("[data-totality-direction]")
+    .forEach((button) => {
+      button.addEventListener("click", () => {
+        const event = button.dataset.totalityDirection === "earlier"
+          ? previousTotality
+          : nextTotality;
+        if (!event) return;
+        button.disabled = true;
+        discoveryStatus.textContent = "Loading the selected total eclipse…";
+        void eventForLocalPeak(event.peak.utc)
+          .then(selectEvent)
+          .catch((error) => {
+            button.disabled = false;
+            discoveryStatus.textContent = `Eclipse selection failed: ${
+              error instanceof Error ? error.message : String(error)
+            }`;
+          });
+      });
+    });
+}
+
 function renderTimeline(): void {
   const state = activeTimeline();
   const placeReady = locatorMode === "date" || selectedObserver !== null;
@@ -300,6 +371,7 @@ function renderTimeline(): void {
   dateControls.hidden = locatorMode !== "date";
   placeControls.hidden = locatorMode !== "place";
   renderLocatorPlace();
+  renderTotalityNeighbours();
 
   loadEarlierButton.disabled =
     !placeReady || !state.initialized || state.loading.earlier;
@@ -442,16 +514,6 @@ async function eventForLocalPeak(
   return closest;
 }
 
-function visibleAboveHorizon(event: LocalEclipse): boolean {
-  return [
-    event.partialBegin,
-    event.centralBegin,
-    event.peak,
-    event.centralEnd,
-    event.partialEnd,
-  ].some((contact) => contact && contact.sunAltitudeDeg > -0.833);
-}
-
 async function resetDateTimeline(year: number): Promise<void> {
   const state = dateTimeline;
   const version = ++state.version;
@@ -482,6 +544,35 @@ async function resetDateTimeline(year: number): Promise<void> {
   }
 }
 
+async function loadTotalityNeighbours(
+  observer: Observer,
+  boundaryUtc: string,
+  version: number,
+): Promise<void> {
+  try {
+    const [previous, next] = await Promise.all([
+      worker.localTotalEventsPage(observer, boundaryUtc, "earlier", 1),
+      worker.localTotalEventsPage(observer, boundaryUtc, "later", 1),
+    ]);
+    if (version !== placeTimeline.version || observer !== selectedObserver) {
+      return;
+    }
+    previousTotality = previous.events[0] ?? null;
+    nextTotality = next.events[0] ?? null;
+    totalityLoading = false;
+    renderTimeline();
+  } catch (error) {
+    if (version !== placeTimeline.version || observer !== selectedObserver) {
+      return;
+    }
+    totalityLoading = false;
+    totalityError = `Could not calculate nearby total eclipses: ${
+      error instanceof Error ? error.message : String(error)
+    }`;
+    renderTimeline();
+  }
+}
+
 async function resetPlaceTimeline(): Promise<void> {
   if (!selectedObserver) {
     placeTimeline.version += 1;
@@ -502,13 +593,31 @@ async function resetPlaceTimeline(): Promise<void> {
   state.initialized = false;
   state.loading = { earlier: true, later: true };
   state.error = "";
+  previousTotality = null;
+  nextTotality = null;
+  totalityLoading = true;
+  totalityError = "";
   renderTimeline();
   writeUrlState();
+  const earlierPage = worker.localEventsPage(
+    observer,
+    startUtc,
+    "earlier",
+    PAGE_SIZE,
+  );
+  const sameDayPage = worker.localEventsInRange(observer, startUtc, endUtc);
+  const laterPage = worker.localEventsPage(
+    observer,
+    endUtc,
+    "later",
+    PAGE_SIZE,
+  );
+  void loadTotalityNeighbours(observer, startUtc, version);
   try {
     const [earlier, sameDay, later] = await Promise.all([
-      worker.localEventsPage(observer, startUtc, "earlier", PAGE_SIZE),
-      worker.localEventsInRange(observer, startUtc, endUtc),
-      worker.localEventsPage(observer, endUtc, "later", PAGE_SIZE),
+      earlierPage,
+      sameDayPage,
+      laterPage,
     ]);
     if (version !== state.version || observer !== selectedObserver) return;
     state.items = sortedUnique(
@@ -735,6 +844,10 @@ function setSelectedObserver(observer: Observer): void {
     placeTimeline.initialized = false;
     placeTimeline.loading = { earlier: false, later: false };
     placeTimeline.error = "";
+    previousTotality = null;
+    nextTotality = null;
+    totalityLoading = false;
+    totalityError = "";
   }
 }
 
