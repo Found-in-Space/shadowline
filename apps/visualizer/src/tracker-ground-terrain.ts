@@ -4,10 +4,7 @@ import type {
   GroundCameraPlan,
   GroundTerrainTile,
 } from "./tracker-ground-plan.js";
-import {
-  groundTerrainTiles,
-  visibleGroundTerrainTiles,
-} from "./tracker-ground-plan.js";
+import { groundTerrainTiles } from "./tracker-ground-plan.js";
 
 const ELEVATION_TILE_SIZE = 512;
 const ELEVATION_URL_TEMPLATE =
@@ -16,9 +13,6 @@ const EARTH_RADIUS_METRES = 6_371_008.8;
 const MAX_PIXEL_RATIO = 2;
 const MAX_ELEVATION_ZOOM = 12;
 const CAMERA_HEIGHT_METRES = 2;
-const MAX_PHOTOGRAPHIC_TILES = 96;
-const TILE_LOAD_CONCURRENCY = 6;
-const REFINEMENT_BATCH_SIZE = 12;
 
 interface GroundImageryConfiguration {
   urlTemplate: string;
@@ -31,7 +25,6 @@ export interface GroundTerrainSnapshot {
   bitmap: ImageBitmap;
   camera: GroundCameraPlan;
   tileCount: number;
-  resourceCount: number;
   photographic: boolean;
   attribution: string;
   width: number;
@@ -44,12 +37,7 @@ export interface GroundTerrainSnapshotOptions {
   width: number;
   height: number;
   signal: AbortSignal;
-  onProgress?: (
-    loaded: number,
-    total: number,
-    phase: "terrain" | "imagery",
-  ) => void;
-  onSnapshot?: (snapshot: GroundTerrainSnapshot) => void;
+  onProgress?: (loaded: number, total: number) => void;
 }
 
 interface DecodedElevation {
@@ -76,34 +64,6 @@ interface LoadedGroundTile {
   tile: GroundTerrainTile;
   elevation: ElevationResource;
   texture: THREE.CanvasTexture | null;
-}
-
-async function mapWithConcurrency<T, Result>(
-  values: readonly T[],
-  concurrency: number,
-  mapper: (value: T, index: number) => Promise<Result>,
-): Promise<Result[]> {
-  const results = new Array<Result>(values.length);
-  let nextIndex = 0;
-  let failure: unknown;
-  const worker = async (): Promise<void> => {
-    while (nextIndex < values.length && failure === undefined) {
-      const index = nextIndex;
-      nextIndex += 1;
-      try {
-        results[index] = await mapper(values[index]!, index);
-      } catch (error) {
-        failure ??= error;
-      }
-    }
-  };
-  const workerCount = Math.min(
-    values.length,
-    Math.max(1, Math.floor(concurrency)),
-  );
-  await Promise.all(Array.from({ length: workerCount }, () => worker()));
-  if (failure !== undefined) throw failure;
-  return results;
 }
 
 function optionalNumber(value: string | undefined, fallback: number): number {
@@ -406,25 +366,24 @@ function cameraDirection(camera: GroundCameraPlan): THREE.Vector3 {
   );
 }
 
-function elevationAtLoadedGround(
+function observerGroundElevation(
   tiles: readonly LoadedGroundTile[],
-  latitudeDeg: number,
-  longitudeDeg: number,
-): number | null {
+  observer: Observer,
+): number {
   for (const loaded of tiles) {
     const centreLongitude = (loaded.tile.westDeg + loaded.tile.eastDeg) / 2;
-    const longitude = longitudeDeg + 360 * Math.round(
-      (centreLongitude - longitudeDeg) / 360,
+    const longitude = observer.longitudeDeg + 360 * Math.round(
+      (centreLongitude - observer.longitudeDeg) / 360,
     );
     if (
       longitude < loaded.tile.westDeg ||
       longitude > loaded.tile.eastDeg ||
-      latitudeDeg > loaded.tile.northDeg ||
-      latitudeDeg < loaded.tile.southDeg
+      observer.latitudeDeg > loaded.tile.northDeg ||
+      observer.latitudeDeg < loaded.tile.southDeg
     ) continue;
     const u = (longitude - loaded.tile.westDeg) /
       (loaded.tile.eastDeg - loaded.tile.westDeg);
-    const latitude = THREE.MathUtils.degToRad(latitudeDeg);
+    const latitude = THREE.MathUtils.degToRad(observer.latitudeDeg);
     const tileCount = 2 ** loaded.tile.z;
     const worldY = (
       1 - Math.asinh(Math.tan(latitude)) / Math.PI
@@ -435,18 +394,7 @@ function elevationAtLoadedGround(
       worldY - loaded.tile.y,
     );
   }
-  return null;
-}
-
-function observerGroundElevation(
-  tiles: readonly LoadedGroundTile[],
-  observer: Observer,
-): number {
-  return elevationAtLoadedGround(
-    tiles,
-    observer.latitudeDeg,
-    observer.longitudeDeg,
-  ) ?? observer.elevationMeters ?? 0;
+  return observer.elevationMeters ?? 0;
 }
 
 export async function renderGroundTerrainSnapshot(
@@ -461,41 +409,57 @@ export async function renderGroundTerrainSnapshot(
   );
   const focalLengthPixels = height * renderPixelRatio /
     (2 * Math.tan(THREE.MathUtils.degToRad(options.camera.verticalFovDeg) / 2));
-  const coarseTiles = groundTerrainTiles(options.observer, options.camera);
+  const tiles = groundTerrainTiles(
+    options.observer,
+    options.camera,
+    imagery
+      ? {
+          maxZoom: imagery.maxZoom,
+          focalLengthPixels,
+          sourceTilePixels: imagery.tileSize,
+        }
+      : {},
+  );
   const scene = new THREE.Scene();
   const meshes: THREE.Mesh[] = [];
-  const textures: THREE.CanvasTexture[] = [];
   const elevationCache = new Map<string, Promise<DecodedElevation>>();
+  let loaded = 0;
+
+  const loadedResults = await Promise.allSettled(tiles.map(async (tile) => {
+    const [elevation, texture] = await Promise.all([
+      elevationResource(tile, options.signal, elevationCache),
+      imagery
+        ? imageryTexture(tile, imagery, options.signal).catch((error: unknown) => {
+            if (options.signal.aborted) throw error;
+            console.warn(`Photographic tile unavailable for ${tile.z}/${tile.x}/${tile.y}.`, error);
+            return null;
+          })
+        : Promise.resolve(null),
+    ]);
+    loaded += 1;
+    options.onProgress?.(loaded, tiles.length);
+    return { tile, elevation, texture };
+  }));
+
+  const failedTile = loadedResults.find(
+    (result): result is PromiseRejectedResult => result.status === "rejected",
+  );
+  const loadedTiles = loadedResults
+    .filter((result): result is PromiseFulfilledResult<LoadedGroundTile> =>
+      result.status === "fulfilled"
+    )
+    .map((result) => result.value);
+  if (failedTile) {
+    for (const loadedTile of loadedTiles) loadedTile.texture?.dispose();
+    throw failedTile.reason;
+  }
+  const photographic = loadedTiles.some((loadedTile) => loadedTile.texture !== null);
+  const groundElevation = observerGroundElevation(loadedTiles, options.observer);
+
   const renderCanvas = document.createElement("canvas");
   let renderer: THREE.WebGLRenderer | null = null;
 
   try {
-    let loadedTerrain = 0;
-    options.onProgress?.(0, coarseTiles.length, "terrain");
-    const loadedCoarseTiles = await mapWithConcurrency(
-      coarseTiles,
-      TILE_LOAD_CONCURRENCY,
-      async (tile): Promise<LoadedGroundTile> => {
-        options.signal.throwIfAborted();
-        const elevation = await elevationResource(
-          tile,
-          options.signal,
-          elevationCache,
-        );
-        loadedTerrain += 1;
-        options.onProgress?.(
-          loadedTerrain,
-          coarseTiles.length,
-          "terrain",
-        );
-        return { tile, elevation, texture: null };
-      },
-    );
-    const groundElevation = observerGroundElevation(
-      loadedCoarseTiles,
-      options.observer,
-    );
-
     renderer = new THREE.WebGLRenderer({
       canvas: renderCanvas,
       alpha: true,
@@ -506,17 +470,11 @@ export async function renderGroundTerrainSnapshot(
     renderer.setPixelRatio(renderPixelRatio);
     renderer.setSize(width, height, false);
     renderer.setClearColor(0x000000, 0);
-    const addTerrainMesh = (
-      loadedTile: LoadedGroundTile,
-      photographicOverlay: boolean,
-    ): void => {
+    for (const loadedTile of loadedTiles) {
       const material = new THREE.MeshLambertMaterial({
         color: loadedTile.texture ? 0xffffff : 0x687263,
         map: loadedTile.texture,
         side: THREE.DoubleSide,
-        polygonOffset: photographicOverlay,
-        polygonOffsetFactor: photographicOverlay ? -1 : 0,
-        polygonOffsetUnits: photographicOverlay ? -1 : 0,
       });
       const mesh = new THREE.Mesh(
         terrainGeometry(
@@ -527,12 +485,8 @@ export async function renderGroundTerrainSnapshot(
         ),
         material,
       );
-      mesh.renderOrder = photographicOverlay ? 1 : 0;
       scene.add(mesh);
       meshes.push(mesh);
-    };
-    for (const loadedTile of loadedCoarseTiles) {
-      addTerrainMesh(loadedTile, false);
     }
     scene.add(new THREE.HemisphereLight(0xeaf4ff, 0x6a6657, 2.05));
     const keyLight = new THREE.DirectionalLight(0xfff4d6, 1.15);
@@ -549,136 +503,29 @@ export async function renderGroundTerrainSnapshot(
     camera.up.set(0, 1, 0);
     camera.lookAt(camera.position.clone().add(cameraDirection(options.camera)));
     camera.updateProjectionMatrix();
-    const snapshot = async (
-      photographicTileCount: number,
-      imageryRequestCount: number,
-    ): Promise<GroundTerrainSnapshot> => {
-      renderer!.render(scene, camera);
-      return {
-        bitmap: await createImageBitmap(renderCanvas),
-        camera: options.camera,
-        tileCount: coarseTiles.length + photographicTileCount,
-        resourceCount: elevationCache.size + imageryRequestCount,
-        photographic: photographicTileCount > 0,
-        attribution: [
-          "Terrain © Mapterhorn · Copernicus GLO-30",
-          photographicTileCount > 0 ? imagery?.attribution : undefined,
-        ]
-          .filter(Boolean)
-          .join(" · "),
-        width,
-        height,
-      };
+    renderer.render(scene, camera);
+    const bitmap = await createImageBitmap(renderCanvas);
+    return {
+      bitmap,
+      camera: options.camera,
+      tileCount: tiles.length,
+      photographic,
+      attribution: [
+        "Terrain © Mapterhorn · Copernicus GLO-30",
+        photographic ? imagery?.attribution : undefined,
+      ]
+        .filter(Boolean)
+        .join(" · "),
+      width,
+      height,
     };
-
-    if (!imagery) return snapshot(0, 0);
-
-    if (options.onSnapshot) {
-      options.signal.throwIfAborted();
-      options.onSnapshot(await snapshot(0, 0));
-    }
-
-    const photographicCandidates = groundTerrainTiles(
-      options.observer,
-      options.camera,
-      {
-        maxZoom: imagery.maxZoom,
-        focalLengthPixels,
-        sourceTilePixels: imagery.tileSize,
-      },
-    );
-    const refinement = visibleGroundTerrainTiles(
-      photographicCandidates,
-      options.observer,
-      options.camera,
-      {
-        groundElevationMetres: groundElevation,
-        elevationAt: (latitudeDeg, longitudeDeg) => elevationAtLoadedGround(
-          loadedCoarseTiles,
-          latitudeDeg,
-          longitudeDeg,
-        ),
-        maxTiles: MAX_PHOTOGRAPHIC_TILES,
-        cameraHeightMetres: CAMERA_HEIGHT_METRES,
-      },
-    );
-    let loadedRefinements = 0;
-    let photographicTileCount = 0;
-    let imageryRequestCount = 0;
-    options.onProgress?.(0, refinement.tiles.length, "imagery");
-    for (
-      let batchStart = 0;
-      batchStart < refinement.tiles.length;
-      batchStart += REFINEMENT_BATCH_SIZE
-    ) {
-      options.signal.throwIfAborted();
-      const batch = refinement.tiles.slice(
-        batchStart,
-        batchStart + REFINEMENT_BATCH_SIZE,
-      );
-      const loadedBatch = await mapWithConcurrency(
-        batch,
-        TILE_LOAD_CONCURRENCY,
-        async (tile): Promise<LoadedGroundTile | null> => {
-          imageryRequestCount += 1;
-          try {
-            const [elevationResult, textureResult] = await Promise.allSettled([
-              elevationResource(tile, options.signal, elevationCache),
-              imageryTexture(tile, imagery, options.signal),
-            ]);
-            if (textureResult.status === "fulfilled") {
-              textures.push(textureResult.value);
-            }
-            if (elevationResult.status === "rejected") {
-              throw elevationResult.reason;
-            }
-            if (textureResult.status === "rejected") {
-              throw textureResult.reason;
-            }
-            return {
-              tile,
-              elevation: elevationResult.value,
-              texture: textureResult.value,
-            };
-          } catch (error) {
-            if (options.signal.aborted) throw error;
-            console.warn(
-              `Photographic tile unavailable for ${tile.z}/${tile.x}/${tile.y}.`,
-              error,
-            );
-            return null;
-          } finally {
-            loadedRefinements += 1;
-            options.onProgress?.(
-              loadedRefinements,
-              refinement.tiles.length,
-              "imagery",
-            );
-          }
-        },
-      );
-      for (const loadedTile of loadedBatch) {
-        if (!loadedTile) continue;
-        addTerrainMesh(loadedTile, true);
-        photographicTileCount += 1;
-      }
-      const isFinalBatch = batchStart + batch.length >= refinement.tiles.length;
-      if (!isFinalBatch && options.onSnapshot) {
-        options.signal.throwIfAborted();
-        options.onSnapshot(await snapshot(
-          photographicTileCount,
-          imageryRequestCount,
-        ));
-      }
-    }
-    return snapshot(photographicTileCount, imageryRequestCount);
   } finally {
     for (const mesh of meshes) {
       mesh.geometry.dispose();
       const material = mesh.material as THREE.MeshLambertMaterial;
       material.dispose();
     }
-    for (const texture of textures) texture.dispose();
+    for (const loadedTile of loadedTiles) loadedTile.texture?.dispose();
     renderer?.dispose();
     renderer?.forceContextLoss();
   }
