@@ -30,6 +30,7 @@ type WorkerResponse =
   | { type: "error"; requestId: number; message: string };
 
 interface TrackerShadowViewOptions {
+  mode?: "tracker" | "browser";
   onStatus?: (message: string) => void;
   onFollowingChange?: (following: boolean) => void;
 }
@@ -272,10 +273,12 @@ export class TrackerShadowView {
     }
   }
 
-  setTime(timeMs: number, event?: EclipseSummary): void {
-    if (event) this.selectedEvent = event;
-    const timeKey = event ? timeMs : Math.floor(timeMs / 1000);
-    const eventId = this.selectedEvent?.id ?? "";
+  setTime(timeMs: number, event: EclipseSummary): void {
+    this.selectedEvent = event;
+    const timeKey = this.options.mode === "tracker"
+      ? Math.floor(timeMs / 1000)
+      : timeMs;
+    const eventId = event.id;
     if (
       timeKey === this.lastRequestedTimeKey &&
       eventId === this.lastRequestedEventId
@@ -298,7 +301,7 @@ export class TrackerShadowView {
   }
 
   private requestFrame(): void {
-    if (this.requestInFlight || this.queuedTimeMs === null) return;
+    if (this.requestInFlight || this.queuedTimeMs === null || !this.selectedEvent) return;
     const atUtc = new Date(this.queuedTimeMs).toISOString();
     this.queuedTimeMs = null;
     this.requestInFlight = true;
@@ -307,7 +310,8 @@ export class TrackerShadowView {
       type: "frame",
       requestId: this.requestId,
       atUtc,
-      event: this.selectedEvent ?? undefined,
+      event: this.selectedEvent,
+      deltaTMode: this.options.mode === "tracker" ? "tracker" : "general",
       angularIntervalDegrees: 0.5,
     });
   }

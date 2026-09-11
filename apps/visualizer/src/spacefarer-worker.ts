@@ -25,6 +25,7 @@ import {
 import {
   configureGeneralDeltaT,
   configureOperationalDeltaT202608,
+  configureTrackerDeltaT,
 } from "./tracker-astronomy.js";
 import type { SpacefarerFrame } from "./spacefarer-frame.js";
 
@@ -33,6 +34,7 @@ interface FrameRequest {
   requestId: number;
   atUtc: string;
   event?: EclipseSummary;
+  deltaTMode?: "general" | "tracker";
   angularIntervalDegrees?: number;
 }
 
@@ -176,7 +178,9 @@ self.addEventListener("message", (message: MessageEvent<WorkerRequest>) => {
     return;
   }
   try {
-    if (request.event) {
+    if (request.deltaTMode === "tracker") {
+      configureTrackerDeltaT((request.event ?? defaultEvent).id);
+    } else if (request.event) {
       configureGeneralDeltaT();
     } else {
       configureOperationalDeltaT202608();

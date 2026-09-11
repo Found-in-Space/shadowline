@@ -321,6 +321,7 @@ async function ensureShadowView(): Promise<TrackerShadowView> {
   if (shadowView) return shadowView;
   const module = await loadShadowModule();
   shadowView = new module.TrackerShadowView(overviewPanes.shadow, {
+    mode: "tracker",
     onStatus: (message) => {
       shadowOverviewCaption = message;
       if (activeOverviewView === "shadow") showOverviewCaption();
@@ -330,7 +331,7 @@ async function ensureShadowView(): Promise<TrackerShadowView> {
       if (activeOverviewView === "shadow") showOverviewCaption();
     },
   });
-  shadowView.setTime(currentTrackerTime());
+  if (event) shadowView.setTime(currentTrackerTime(), event);
   return shadowView;
 }
 
@@ -368,7 +369,7 @@ async function selectOverviewView(view: OverviewView, focus = false): Promise<vo
     if (view === "shadow") {
       const renderer = await ensureShadowView();
       renderer.setActive(true);
-      renderer.setTime(currentTrackerTime());
+      if (event) renderer.setTime(currentTrackerTime(), event);
     }
     if (view === "ground") {
       const renderer = await ensureGroundView();
@@ -736,7 +737,7 @@ function renderFrame(): void {
     lastShadowBucket = shadowBucket;
     void updateShadow(atMs);
   }
-  if (activeOverviewView === "shadow") shadowView?.setTime(atMs);
+  if (activeOverviewView === "shadow" && event) shadowView?.setTime(atMs, event);
 }
 
 function updateRange(): void {

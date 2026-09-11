@@ -10,6 +10,28 @@ test.beforeEach(async ({ page }) => {
   );
 });
 
+for (const eclipse of [
+  { slug: "202608", eventId: "solar-2026-08-12-total", atUtc: "2026-08-12T17:45:46.794Z" },
+  { slug: "202708", eventId: "solar-2027-08-02-total", atUtc: "2027-08-02T10:06:34.636Z" },
+  { slug: "202807", eventId: "solar-2028-07-22-total", atUtc: "2028-07-22T02:55:24.627Z" },
+]) {
+  test(`renders the ${eclipse.slug} shadow at the selected preview time`, async ({ page }) => {
+    await page.goto(`/tracker/${eclipse.slug}/?at=${eclipse.atUtc}`);
+    await page.getByRole("tab", { name: "Shadow", exact: true }).click();
+
+    const shadow = page.locator("#tracker-shadow");
+    await expect(shadow).toHaveAttribute("data-event-id", eclipse.eventId);
+    await expect(shadow).toHaveAttribute("data-frame-utc", eclipse.atUtc);
+    await expect(page.locator("#overview-caption")).toContainText("The narrow purple cone reaches Earth.");
+
+    await page.locator('[data-nudge="60"]').click();
+    const nudgedUtc = new Date(Date.parse(eclipse.atUtc) + 60_000).toISOString();
+    await expect(shadow).toHaveAttribute("data-frame-utc", nudgedUtc);
+    await expect(shadow).toHaveAttribute("data-event-id", eclipse.eventId);
+    await expect(page).toHaveURL((url) => url.searchParams.get("at") === nudgedUtc);
+  });
+}
+
 test("serves the tracker from its service worker while the browser is offline", async ({
   page,
   context,
